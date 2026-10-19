@@ -1,0 +1,61 @@
+package views
+
+import "fmt"
+
+templ Navigation(active string, d PageData) {
+ <nav class="app-nav" aria-label={tr(d.Language,"nav.aria")}>
+  <a href="/studio" hx-get="/studio" hx-target="#studio" hx-swap="outerHTML show:window:top" hx-push-url="true" class={ templ.KV("is-active", active=="studio") } aria-current={ currentPage(active,"studio") }>
+   <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 1.5 5.5L19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5L12 3Z"/><path d="m19 16 .7 2.3L22 19l-2.3.7L19 22l-.7-2.3L16 19l2.3-.7L19 16Z"/></svg></span><span class="nav-label">{tr(d.Language,"nav.create")}</span>
+  </a>
+  <a href="/library" hx-get="/library" hx-target="#studio" hx-swap="outerHTML show:window:top" hx-push-url="true" class={ templ.KV("is-active", active=="library") } aria-current={ currentPage(active,"library") }>
+   <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="13" height="15" rx="2"/><path d="M8 8h5M8 12h5M8 16h3M17 8h2a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9"/></svg></span><span class="nav-label">{tr(d.Language,"nav.library")}</span>
+  </a>
+  <a href={ orderPath(d) } hx-get={ orderPath(d) } hx-target="#studio" hx-swap="outerHTML show:window:top" hx-push-url="true" class={ templ.KV("is-active", active=="cart" || active=="status") } aria-current={ orderCurrent(active) }>
+   <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7.5h14l-1 12H6l-1-12Z"/><path d="M9 9V6a3 3 0 0 1 6 0v3"/></svg></span><span class="nav-label">{tr(d.Language,"nav.order")}
+    if d.CartCount>0 {
+     <b class="nav-count">{ fmt.Sprint(d.CartCount) }</b>
+    }
+   </span>
+  </a>
+ </nav>
+ if d.IsAdmin {
+  <a class={ "admin-link", templ.KV("is-active",active=="admin") } href="/admin" hx-get="/admin" hx-target="#studio" hx-swap="outerHTML show:window:top" hx-push-url="true"><span class="admin-link-copy"><span class="admin-link-icon" aria-hidden="true">⌘</span><span>{tr(d.Language,"nav.admin")}</span></span><span class="admin-link-arrow" aria-hidden="true">↗</span></a>
+ }
+ <details class="language-menu">
+  <summary class="language-toggle" aria-label={tr(d.Language,"nav.language")}><span aria-hidden="true">文</span><span>{d.CurrentLanguageLabel()}</span><span class="language-chevron" aria-hidden="true">⌄</span></summary>
+  <div class="language-menu-list" role="menu">
+   for _, option := range d.LanguageOptions() {
+    <a role="menuitem" href={templ.SafeURL("/language?lang="+option.Code)}>{option.NativeName}<small>{option.Name}</small></a>
+   }
+  </div>
+ </details>
+}
+
+templ Feedback(d PageData) {
+ if d.Notice!="" {
+  <div class="notice" role="status">{ d.Notice }</div>
+ }
+ <div id="studio-error" class="inline-error" role="alert" hidden?={ d.Error=="" }>{ d.Error }</div>
+}
+
+templ PageHeading(kicker string, title string, description string) {
+ <header class="section-intro"><span class="eyebrow">{ kicker }</span><h1>{ title }</h1><p class="lead">{ description }</p></header>
+}
+
+templ EmptyState(icon string,title string,text string) {
+ <div class="empty-state"><span class="empty-symbol" aria-hidden="true">{ icon }</span><h2>{ title }</h2><p>{ text }</p></div>
+}
+
+templ UploadForm(kind string, admin bool, language string) {
+ <form class="upload-form" action={ uploadRoute(kind,admin) } method="post" enctype="multipart/form-data" hx-post={ uploadRoute(kind,admin) } hx-encoding="multipart/form-data" hx-target="#studio" hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']">
+  <div class="form-field"><label class="field-label" for={ uploadID(kind,admin)+"-title" }>{tr(language,"upload.title")}</label><input id={ uploadID(kind,admin)+"-title" } name="title" type="text" maxlength="120" placeholder={ uploadPlaceholder(kind,language) } required/></div>
+  <div class="form-field"><label class="file-field" for={ uploadID(kind,admin)+"-file" }><span class="upload-symbol">↑</span><span><strong>{ uploadLabel(kind,language) }</strong><small data-file-label>{tr(language,"upload.file")}</small></span><input id={ uploadID(kind,admin)+"-file" } name="file" type="file" accept={ uploadAccept(kind) } required/></label></div>
+  if kind=="datasets" {
+   <p class="field-hint">{tr(language,"upload.csv.hint")} <a class="inline-link" href="/datasets/example.csv" download>{tr(language,"upload.example")}</a></p>
+  } else {
+   <p class="field-hint">{tr(language,"upload.audio.hint")}</p>
+  }
+  <progress class="upload-progress" value="0" max="100" hidden aria-label="Загрузка файла"></progress>
+  <button class="secondary-button" type="submit"><span>{ uploadButton(kind,admin,language) }</span><span>↑</span></button>
+ </form>
+}

@@ -1,0 +1,117 @@
+package views
+
+import "fmt"
+
+templ Admin(d AdminData) {
+ <section id="studio" aria-live="polite">
+  @Navigation("admin",d.PageData)
+  @Feedback(d.PageData)
+  <div class="admin-shell">
+   <header class="admin-hero">
+    <div class="admin-hero-copy">
+    <span class="eyebrow">{tr(d.Language,"admin.kicker")}</span>
+    <h1>{tr(d.Language,"admin.title")}</h1>
+    <p class="lead">{tr(d.Language,"admin.lead")}</p>
+    </div>
+    <span class="admin-live"><i aria-hidden="true"></i>{tr(d.Language,"admin.online")}</span>
+   </header>
+   <nav class="admin-tabs" aria-label={tr(d.Language,"admin.nav")} role="tablist">
+    for _,tab:=range adminTabs(d.Language) {
+     <a role="tab" href={templ.SafeURL("/admin?tab="+tab.Code)} hx-get={"/admin?tab="+tab.Code} hx-target="#studio" hx-swap="outerHTML" class={templ.KV("is-active",adminTab(d.Tab)==tab.Code)} aria-current={currentPage(adminTab(d.Tab),tab.Code)} aria-selected={fmt.Sprint(adminTab(d.Tab)==tab.Code)}>{tab.Label}</a>
+    }
+   </nav>
+   <div class="admin-content">
+   switch adminTab(d.Tab) {
+   case "overview":
+    <section class="admin-section admin-overview" aria-labelledby="overview-title">
+     <div class="admin-section-heading"><div><span class="card-kicker">{tr(d.Language,"admin.today")}</span><h2 id="overview-title">{tr(d.Language,"admin.summary")}</h2></div><span class="admin-section-caption">{tr(d.Language,"admin.update")}</span></div>
+     <div class="metrics-grid">
+      <div class="metric-card"><span class="metric-icon" aria-hidden="true">♙</span><div><span>{tr(d.Language,"admin.users.count")}</span><strong>{fmt.Sprint(d.UserCount)}</strong></div></div>
+      <div class="metric-card"><span class="metric-icon" aria-hidden="true">⌑</span><div><span>{tr(d.Language,"admin.orders.count")}</span><strong>{fmt.Sprint(d.OrderCount)}</strong></div></div>
+      <div class="metric-card"><span class="metric-icon" aria-hidden="true">◈</span><div><span>{tr(d.Language,"admin.jobs.count")}</span><strong>{fmt.Sprint(d.JobCount)}</strong></div></div>
+      <div class="metric-card metric-card-accent"><span class="metric-icon" aria-hidden="true">↗</span><div><span>{tr(d.Language,"admin.pending")}</span><strong>{fmt.Sprint(d.PendingCount)}</strong></div></div>
+     </div>
+     <div class="overview-note"><div><span class="card-kicker">{tr(d.Language,"admin.paid")}</span><strong>{d.Revenue}</strong></div><p>{tr(d.Language,"admin.revenue")}</p></div>
+    </section>
+    if d.FailedCount>0 {
+     <a class="notice warning-notice" href="/admin?tab=orders" hx-get="/admin?tab=orders" hx-target="#studio" hx-swap="outerHTML" hx-push-url="true">{tr(d.Language,"admin.retry")}: {fmt.Sprint(d.FailedCount)} <span>↗</span></a>
+    }
+    <div class="admin-guide"><span class="card-kicker">{tr(d.Language,"admin.workflow")}</span><h2>{tr(d.Language,"admin.workflow.title")}</h2><p>{tr(d.Language,"admin.lead")}</p></div>
+   case "library":
+     <section class="admin-section admin-library" aria-labelledby="library-title">
+     <div class="admin-section-heading"><div><span class="card-kicker">{tr(d.Language,"library.kicker")}</span><h2 id="library-title">{tr(d.Language,"library.title")}</h2></div><span class="admin-section-caption">{tr(d.Language,"admin.library.access")}</span></div>
+     <div class="admin-upload-grid"><details class="upload-disclosure"><summary><span><b>↑</b> {tr(d.Language,"admin.add.dataset")}</span><span>+</span></summary>@UploadForm("datasets",true,d.Language)</details>
+     <details class="upload-disclosure"><summary><span><b>♫</b> {tr(d.Language,"admin.add.music")}</span><span>+</span></summary>@UploadForm("music",true,d.Language)</details></div>
+    <section class="library-section"><div class="list-heading"><h2>{tr(d.Language,"library.datasets")}</h2><span class="count-label">{fmt.Sprint(len(d.Datasets))}</span></div><div class="card-list">
+     for _,item:=range d.Datasets {
+      @DatasetCard(item,true,d.Language)
+     }
+     if len(d.Datasets)==0 {
+      @EmptyState("▥",tr(d.Language,"admin.dataset.empty.title"),tr(d.Language,"admin.dataset.empty.text"))
+     }
+    </div></section>
+    <section class="library-section"><div class="list-heading"><h2>{tr(d.Language,"library.music")}</h2><span class="count-label">{fmt.Sprint(len(d.Music))}</span></div><div class="card-list">
+     for _,item:=range d.Music {
+      @MusicCard(item,true,d.Language)
+     }
+     if len(d.Music)==0 {
+      @EmptyState("♫",tr(d.Language,"admin.music.empty.title"),tr(d.Language,"admin.music.empty.text"))
+     }
+    </div></section>
+    </section>
+   case "users":
+    <section class="admin-section admin-users" aria-labelledby="users-title"><div class="admin-section-heading"><div><span class="card-kicker">{tr(d.Language,"admin.access")}</span><h2 id="users-title">{tr(d.Language,"admin.users")}</h2></div><span class="admin-section-caption">{fmt.Sprintf(tr(d.Language,"admin.accounts"),d.UserCount)}</span></div><div class="card-list">
+     for _,u:=range d.Users {
+      <article class="item-card user-card"><div class="user-avatar" aria-hidden="true">{initial(u.Name)}</div><div class="item-main"><h2>{u.Name}</h2><p>{u.Username}</p><span class="detail-text">Telegram {u.TelegramID} · {u.JoinedAt}</span>
+       if u.IsSelf {
+        <span class="resource-tag personal-tag">Твой аккаунт · администратор</span>
+       } else {
+        <form class="role-form" action={routeID("/admin/users",u.ID,"/role")} method="post" hx-post={routeID("/admin/users",u.ID,"/role")} hx-target="#studio" hx-swap="outerHTML" hx-disabled-elt="find button">
+         <label class="sr-only" for={fmt.Sprintf("role-%d",u.ID)}>Роль {u.Name}</label><select id={fmt.Sprintf("role-%d",u.ID)} name="role"><option value="USER" selected?={u.Role=="USER"}>Пользователь</option><option value="ADMIN" selected?={u.Role=="ADMIN"}>Администратор</option></select><button class="compact-button" type="submit">Сохранить</button>
+        </form>
+       }
+      </div></article>
+     }
+    </div></section>
+   case "orders":
+    <section class="admin-section admin-orders" aria-labelledby="orders-title"><div class="admin-section-heading"><div><span class="card-kicker">{tr(d.Language,"admin.operations")}</span><h2 id="orders-title">{tr(d.Language,"admin.orders")}</h2></div><span class="admin-section-caption">{tr(d.Language,"admin.all.users")}</span></div><div class="order-list">
+     for _,order:=range d.Orders {
+      @OrderCard(order,true,d.Language)
+     }
+     if len(d.Orders)==0 {
+      @EmptyState("▷","Заказов пока нет","Оформленные видео появятся здесь вместе со статусами.")
+     }
+    </div></section>
+   case "promos":
+    <section class="admin-section admin-promos" aria-labelledby="promos-title"><div class="admin-section-heading"><div><span class="card-kicker">{tr(d.Language,"admin.sales")}</span><h2 id="promos-title">{tr(d.Language,"admin.promos")}</h2></div><span class="admin-section-caption">{tr(d.Language,"admin.discounts")}</span></div><details class="upload-disclosure"><summary><span><b>+</b> {tr(d.Language,"admin.create.promo")}</span><span>+</span></summary>
+     <form class="upload-form" action="/admin/promos" method="post" hx-post="/admin/promos" hx-target="#studio" hx-swap="outerHTML" hx-disabled-elt="find button">
+      <div class="form-field"><label class="field-label" for="new-promo-code">Код</label><input id="new-promo-code" name="code" type="text" maxlength="50" required placeholder="Например, WELCOME" autocomplete="off"/></div>
+      <div class="form-grid"><div><label class="field-label" for="promo-discount">Скидка, %</label><input id="promo-discount" name="discount_percent" type="number" min="1" max="100" value="20" required/></div><div><label class="field-label" for="promo-limit">Лимит использований</label><input id="promo-limit" name="max_uses" type="number" min="1" placeholder="Без лимита"/></div></div>
+      <div class="form-field"><label class="field-label" for="promo-until">Действует до (необязательно)</label><input id="promo-until" name="valid_until" type="date"/></div><button class="secondary-button" type="submit">Создать промокод <span>+</span></button>
+     </form>
+    </details>
+    <div class="card-list">
+     for _,promo:=range d.Promos {
+      <article class="item-card promo-card"><div class="promo-percent">{promo.Discount}</div><div class="item-main"><h2>{promo.Code}</h2><p>Использовано: {promo.Usage}</p><span class="detail-text">{promo.Expires}</span><span class={"resource-tag",templ.KV("archived-tag",!promo.Active)}>
+        if promo.Active {
+         Активен
+        } else {
+         Отключён
+        }
+       </span></div><form action={routeID("/admin/promos",promo.ID,"/toggle")} method="post" hx-post={routeID("/admin/promos",promo.ID,"/toggle")} hx-target="#studio" hx-swap="outerHTML" hx-disabled-elt="find button"><button class="text-button" type="submit">
+        if promo.Active {
+         Отключить
+        } else {
+         Включить
+        }
+       </button></form></article>
+     }
+     if len(d.Promos)==0 {
+      @EmptyState("%","Промокодов пока нет","Создай скидку для первого заказа.")
+     }
+    </div></section>
+  }
+   </div>
+  </div>
+ </section>
+}

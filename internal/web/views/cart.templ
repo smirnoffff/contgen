@@ -1,0 +1,73 @@
+package views
+
+import "fmt"
+
+templ Cart(d CartData) {
+	<section id="studio" aria-live="polite">
+		@Navigation("cart", d.PageData)
+		@Feedback(d.PageData)
+		@PageHeading(tr(d.Language,"cart.kicker"), tr(d.Language,"cart.title"), tr(d.Language,"cart.lead"))
+		if len(d.Items)==0 {
+			@EmptyState("⌑",tr(d.Language,"cart.empty.title"),tr(d.Language,"cart.empty.text"))
+			<a class="primary-button" href="/studio" hx-get="/studio" hx-target="#studio" hx-swap="outerHTML show:window:top" hx-push-url="true"><span>{tr(d.Language,"cart.configure")}</span><span>↗</span></a>
+		} else {
+			<div class="cart-overview"><div><span class="card-kicker">{tr(d.Language,"cart.in.order")}</span><strong>{cartCountLabel(d.Language,len(d.Items))}</strong><small>{tr(d.Language,"cart.overview.hint")}</small></div><span class="cart-overview-price">{d.Total}</span></div>
+			<div class="card-list cart-items">
+				for i,item:=range d.Items {
+					<article class="item-card cart-item"><span class="item-index">{fmt.Sprintf("%02d",i+1)}</span><div class="item-main"><h2>{item.Title}</h2><p>{item.Theme}</p><span class="detail-text">
+						if item.Music!="" {
+							♫ {item.Music}
+						} else {
+							{tr(d.Language,"cart.no.music")}
+						}
+					</span></div><div class="item-side"><form action={routeID("/cart/items",item.ID,"/delete")} method="post" hx-post={routeID("/cart/items",item.ID,"/delete")} hx-target="#studio" hx-swap="outerHTML" hx-disabled-elt="find button"><button class="icon-button danger-text" type="submit" aria-label={tr(d.Language,"cart.remove")}>×</button></form></div></article>
+				}
+			</div>
+			<form class="checkout-card" action="/cart/checkout" method="post" hx-post="/cart/checkout" hx-disabled-elt="find button">
+				<input type="hidden" name="order_id" value={fmt.Sprint(d.OrderID)}/>
+				<div class="checkout-intro"><div><span class="card-kicker">{tr(d.Language,"cart.payment.aria")}</span><strong>{tr(d.Language,"cart.pay.choose")}</strong></div><span>{d.Total}</span></div>
+				<div class="payment-methods" role="radiogroup" aria-label={tr(d.Language,"cart.payment.aria")}>
+					<label class={"payment-method", templ.KV("is-selected", d.AdsEnabled), templ.KV("is-unavailable", !d.AdsEnabled)} data-payment-choice-card>
+						<input type="radio" name="payment_method" value="ADS" checked?={d.AdsEnabled} disabled?={!d.AdsEnabled} data-payment-choice/>
+						<span class="payment-method-copy"><strong>{tr(d.Language,"cart.ads")}</strong><small>
+							if d.AdsEnabled {
+								{fmt.Sprintf(tr(d.Language,"cart.ads.free"), d.AdTotal)}
+							} else {
+								{tr(d.Language,"cart.ads.disabled")}
+							}
+						</small></span><span class="choice-mark"></span>
+					</label>
+					<label class={"payment-method", templ.KV("is-selected", !d.AdsEnabled)} data-payment-choice-card>
+						<input type="radio" name="payment_method" value="STARS" checked?={!d.AdsEnabled} data-payment-choice/>
+						<span class="payment-method-copy"><strong>{tr(d.Language,"cart.stars")}</strong><small>{d.Total} · {tr(d.Language,"cart.stars.now")}</small></span><span class="choice-mark"></span>
+					</label>
+				</div>
+				<div class="payment-panel" data-payment-panel="ADS" hidden?={!d.AdsEnabled}>
+					<div class="ad-payment" data-ad-videos={fmt.Sprint(d.AdVideoCount)} data-ad-total={fmt.Sprint(d.AdTotal)}>
+						<div class="ad-payment-head"><div><span class="card-kicker">{tr(d.Language,"cart.ads.method")}</span><h2>{tr(d.Language,"cart.ads.title")}</h2></div><strong data-ad-summary-count>00 / {fmt.Sprintf("%02d", d.AdTotal)}</strong></div>
+						<div class="ad-progress" data-ad-progress aria-live="polite">
+							<div class="ad-progress-meta"><span data-ad-progress-label>{fmt.Sprintf(tr(d.Language,"cart.ads.current"), 1, d.AdVideoCount, 1)}</span><strong data-ad-progress-percent>0%</strong></div>
+							<div class="ad-progress-track"><span data-ad-progress-fill></span></div>
+							<p data-ad-current-video>{tr(d.Language,"cart.ads.each")}</p>
+						</div>
+						<div class="ad-steps" aria-label={tr(d.Language,"cart.ads.each")}>
+							<div class="ad-step is-current" data-ad-step="1"><span>01</span><div><strong>{tr(d.Language,"cart.ad.first")}</strong><small>{tr(d.Language,"cart.ad.open")}</small></div><b>○</b></div>
+							<div class="ad-step" data-ad-step="2"><span>02</span><div><strong>{tr(d.Language,"cart.ad.second")}</strong><small>{tr(d.Language,"cart.ad.next")}</small></div><b>○</b></div>
+						</div>
+						<button class="primary-button ad-start" type="button" data-ad-start data-ad-total={fmt.Sprint(d.AdTotal)} disabled?={!d.CheckoutEnabled}><span data-ad-label>{tr(d.Language,"cart.ad.start")}</span><span data-ad-action-count>{fmt.Sprintf(tr(d.Language,"cart.ad.count"),1,d.AdTotal)}</span></button>
+						<p class="ad-status" data-ad-status role="status" hidden></p>
+						<p class="field-hint">{tr(d.Language,"cart.ad.foot")}</p>
+					</div>
+				</div>
+				<div class="payment-panel" data-payment-panel="STARS" hidden?={d.AdsEnabled}>
+					<div class="stars-payment"><span class="card-kicker">{tr(d.Language,"cart.stars.method")}</span><h2>{tr(d.Language,"cart.stars.title")}</h2><p>{tr(d.Language,"cart.stars.text")}</p><button class="primary-button" type="submit" disabled?={!d.CheckoutEnabled}><span>{tr(d.Language,"cart.pay")}</span><span>{d.Total} ↗</span></button></div>
+				</div>
+				<details class="promo-disclosure"><summary>{tr(d.Language,"cart.promo.have")}</summary>
+					<label class="field-label" for="promo-code">{tr(d.Language,"cart.promo")}</label><input id="promo-code" type="text" name="code" maxlength="100" placeholder="WELCOME" autocomplete="off"/>
+					<button class="secondary-button" type="submit">{tr(d.Language,"cart.promo.apply")} <span>↗</span></button>
+				</details>
+				<p class="checkout-footnote"><span>✓</span> {tr(d.Language,"cart.foot")}</p>
+			</form>
+		}
+	</section>
+}

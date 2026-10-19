@@ -1,0 +1,41 @@
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# Go tooling and build output
+/bin/
+/dist/
+*.exe
+*.test
+*.out
+coverage.out
+
+# Python tooling
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+
+# Runtime data and generated media
+/data/
+/artifacts/
+*.mp4
+*.mov
+*.webm
+*.mp3
+*.wav
+*.ogg
+*.m4a
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

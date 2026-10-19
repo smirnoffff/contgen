@@ -1,0 +1,167 @@
+package views
+
+import "fmt"
+
+templ Page(devLogin bool, authenticated bool, language string, adsGramBlockID string, adsGramDebug bool, content templ.Component) {
+	<!DOCTYPE html>
+	<html lang={NormalizeLanguage(language)}>
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+			<meta name="color-scheme" content="dark light"/>
+			<meta name="htmx-config" content='{"allowEval":false,"allowScriptTags":false,"historyCacheSize":0}'/>
+			<title>{tr(language,"page.title")}</title>
+			<link rel="stylesheet" href="/static/app.css"/>
+			<script src="https://telegram.org/js/telegram-web-app.js" defer></script>
+			if adsGramBlockID != "" {
+				<script src="https://sad.adsgram.ai/js/sad.min.js" defer></script>
+			}
+			<script src="/static/htmx.min.js" defer></script>
+			<script src="/static/app.js" defer></script>
+		</head>
+		<body data-authenticated={ fmt.Sprint(authenticated) } data-local-demo={ fmt.Sprint(devLogin) } data-adsgram-block-id={ adsGramBlockID } data-adsgram-debug={ fmt.Sprint(adsGramDebug) }>
+			<div class="app-shell">
+				<header class="topbar">
+					<a class="brand" href="/" aria-label="CONTGEN"><span class="brand-icon"><i></i><i></i><i></i></span>CONTGEN<span class="brand-dot">.</span></a>
+					<span class="studio-pill"><span></span> VIDEO STUDIO</span>
+				</header>
+				<main>
+					@content
+				</main>
+				<footer class="page-footer"><span>{tr(language,"page.footer")}</span><span>CONTGEN / STUDIO</span></footer>
+			</div>
+		</body>
+	</html>
+}
+
+templ Welcome(devLogin bool, language string) {
+	<section id="studio" class="welcome" aria-live="polite">
+		<div class="eyebrow">{tr(language,"welcome.eyebrow")}</div>
+		<h1>{tr(language,"welcome.title.line1")}<br/>{tr(language,"welcome.title.line2")}<span class="accent">.</span></h1>
+		<p class="lead">{tr(language,"welcome.lead")}</p>
+		<div class="login-card">
+			<span class="card-kicker">{tr(language,"welcome.kicker")}</span>
+			if devLogin {
+				<h2 id="login-title">{tr(language,"welcome.local.title")}</h2>
+				<p id="login-message">{tr(language,"welcome.local.text")}</p>
+			} else {
+				<h2 id="login-title">{tr(language,"welcome.telegram.title")}</h2>
+				<p id="login-message">{tr(language,"welcome.telegram.text")}</p>
+			}
+			if devLogin {
+				<button id="dev-login" class="primary-button" type="button">{tr(language,"welcome.local.button")} <span>↗</span></button>
+			}
+			<button id="retry-login" class="text-button" type="button" hidden>{tr(language,"welcome.retry")}</button>
+		</div>
+	</section>
+}
+
+templ Studio(d StudioData) {
+	<section id="studio" aria-live="polite">
+		@Navigation("studio", d.PageInfo())
+		@Feedback(d.PageInfo())
+		<div class="studio-header">
+			<div class="intro-row"><span class="eyebrow">{tr(d.Language,"studio.kicker")}</span><span class="user-chip">{ d.User.FirstName }</span></div>
+			<h1 class="studio-title">{tr(d.Language,"studio.title")}<br/><span class="muted-title">{tr(d.Language,"studio.title.muted")}</span></h1>
+			<p class="lead">{tr(d.Language,"studio.lead")}</p>
+			<div class="studio-route" aria-label={tr(d.Language,"studio.kicker")}><span class="is-active">{tr(d.Language,"studio.route.data")}</span><i>→</i><span>{tr(d.Language,"studio.route.style")}</span><i>→</i><span>{tr(d.Language,"studio.route.telegram")}</span></div>
+		</div>
+		<div class="workspace">
+			<form id="studio-settings" class="settings" action="/studio" method="get" hx-get="/studio" hx-trigger="change" hx-target="#studio" hx-swap="outerHTML" hx-push-url="true" hx-sync="this:replace" hx-indicator="#update-indicator">
+				<section class="setting-section">
+					<div class="section-heading"><span class="step-number">01</span><div><h2>{tr(d.Language,"studio.data")}</h2><p>{tr(d.Language,"studio.data.help")}</p></div></div>
+					if len(d.Datasets) == 0 {
+						<div class="empty-data"><span>{tr(d.Language,"studio.no.datasets")}</span><p>{tr(d.Language,"studio.no.datasets.text")}</p></div>
+					} else {
+						<label class="field-label" for="dataset-select">{tr(d.Language,"studio.dataset")}</label>
+						<select id="dataset-select" name="dataset_id">
+							for _, dataset := range d.Datasets {
+								<option value={ fmt.Sprint(dataset.ID) } selected?={ d.Selected != nil && d.Selected.ID == dataset.ID }>{ datasetDisplayTitle(d.Language, dataset.Title, dataset.UserID == nil) }</option>
+							}
+						</select>
+						if d.Selected != nil {
+							<div class="dataset-caption"><span class="tiny-dot"></span><span>{ d.Period() } · { fmt.Sprint(d.PointCount) } точек</span></div>
+						}
+					}
+				</section>
+				<section class="setting-section theme-section">
+					<div class="section-heading"><span class="step-number">02</span><div><h2>{tr(d.Language,"studio.style")}</h2><p>{tr(d.Language,"studio.style.help")}</p></div></div>
+					<div class="theme-grid">
+						for _, theme := range d.Themes {
+							<label class="theme-option">
+								<input id={ "theme-" + string(theme.Code) } type="radio" name="theme" value={ string(theme.Code) } checked?={ d.Theme == theme.Code }/>
+								<span class="theme-card"><span class="theme-card-top"><strong>{ theme.Name }</strong><span class="selection-dot"></span></span><span class="theme-description">{ theme.Description }</span><span class="swatches">
+									for _, color := range theme.Swatches {
+										<i style={ "background:" + color }></i>
+									}
+								</span></span>
+							</label>
+						}
+						</div>
+					</section>
+					<aside class="preview-area" aria-label="Предпросмотр выбранных данных">
+						<div class="preview-heading"><span class="card-kicker">{tr(d.Language,"studio.preview")}</span><span class="frame-tag">9:16</span></div>
+						<div class="preview-frame" style={ d.PreviewStyle } data-theme={ string(d.Theme) }>
+							<div class="frame-grid"></div>
+							<div class="frame-content">
+								<div class="frame-top"><span>CONTGEN</span><span>DATA / STORY</span></div>
+								if d.Selected != nil {
+									<h3>{ datasetDisplayTitle(d.Language, d.Selected.Title, d.Selected.UserID == nil) }</h3>
+								} else {
+									<h3>Твоя следующая<br/>история</h3>
+								}
+								<div class="frame-subtitle">{ d.Period() }</div>
+								if len(d.Bars) > 0 {
+									<div class="chart-bars">
+										for i, bar := range d.Bars {
+											<div class="chart-row"><div class="bar-caption"><span><span class="rank">{ fmt.Sprintf("%02d", i+1) }</span>{ bar.Name }</span><strong>{ bar.Value }</strong></div><div class="bar-track"><div class="bar-fill" style={ "width:" + bar.Width + ";background:" + bar.Color }></div></div></div>
+										}
+									</div>
+								} else {
+									<div class="preview-empty">{ previewMessage(d) }</div>
+								}
+								<div class="frame-bottom"><span>ПОСЛЕДНИЙ КАДР</span><strong>{ lastYear(d) }</strong></div>
+							</div>
+						</div>
+						<p class="preview-note">{tr(d.Language,"studio.preview.note")}</p>
+					</aside>
+					<section class="setting-section music-section">
+					<div class="section-heading"><span class="step-number">03</span><div><h2>{tr(d.Language,"studio.sound")} <span class="optional-label">{tr(d.Language,"studio.optional")}</span></h2><p>{tr(d.Language,"studio.sound.help")}</p></div></div>
+					<label class="field-label" for="music-select">{tr(d.Language,"studio.track")}</label>
+					<select id="music-select" name="music_id">
+						<option value="0" selected?={ d.MusicID==0 }>{tr(d.Language,"studio.no.music")}</option>
+						for _,music:=range d.Music {
+							<option value={ fmt.Sprint(music.ID) } selected?={d.MusicID==music.ID}>{music.Title}</option>
+						}
+					</select>
+					if d.SelectedMusicURL()!="" {
+						<audio class="audio-preview" controls preload="none" src={templ.SafeURL(d.SelectedMusicURL())} aria-label={tr(d.Language,"studio.audio")}></audio>
+					}
+					<p class="field-hint">{tr(d.Language,"studio.materials")}</p>
+				</section>
+				<div class="settings-bottom"><span>{tr(d.Language,"studio.format")}</span><span id="update-indicator" class="htmx-indicator" role="status">{tr(d.Language,"studio.refresh")}</span></div>
+				<noscript><button class="primary-button" type="submit">Обновить предпросмотр</button></noscript>
+			</form>
+		</div>
+		if d.Selected != nil {
+			<div class="data-summary"><div><span>{tr(d.Language,"studio.period")}</span><strong>{ d.Period() }</strong></div><div><span>{tr(d.Language,"studio.entities")}</span><strong>{ fmt.Sprint(d.EntityCount) }</strong></div><div><span>{tr(d.Language,"studio.points")}</span><strong>{ fmt.Sprint(d.PointCount) }</strong></div></div>
+		}
+		<form class="create-action" action="/cart/items" method="post" hx-post="/cart/items" hx-target="#studio" hx-swap="outerHTML" hx-disabled-elt="find button">
+			<input type="hidden" name="dataset_id" value={d.SelectedID()}/><input type="hidden" name="theme" value={string(d.Theme)}/><input type="hidden" name="music_id" value={fmt.Sprint(d.MusicID)}/>
+			<button class="primary-button" type="submit" disabled?={ !d.CanAdd }><span>{tr(d.Language,"studio.create")}</span><span>
+				if d.AdsEnabled {
+					{tr(d.Language,"studio.ads")}
+				} else {
+					{d.Price} ⭐
+				}
+				<span aria-hidden="true">↗</span></span></button>
+			<p class="field-hint centered">
+				if d.AdsEnabled {
+					{tr(d.Language,"studio.ads.help")}
+				} else {
+					{tr(d.Language,"studio.stars")}
+				}
+			</p>
+		</form>
+	</section>
+}

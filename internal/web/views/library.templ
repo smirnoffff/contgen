@@ -1,0 +1,91 @@
+package views
+
+import "fmt"
+
+templ Library(d LibraryData) {
+ <section id="studio" aria-live="polite">
+  @Navigation("library",d.PageData)
+  @Feedback(d.PageData)
+  @PageHeading(tr(d.Language,"library.kicker"), tr(d.Language,"library.title"), tr(d.Language,"library.lead"))
+  <details class="upload-disclosure"><summary><span>{tr(d.Language,"library.upload.datasets")}</span><span>+</span></summary>@UploadForm("datasets",false,d.Language)</details>
+  <details class="upload-disclosure"><summary><span>{tr(d.Language,"library.upload.music")}</span><span>+</span></summary>@UploadForm("music",false,d.Language)</details>
+  <section class="library-section"><div class="list-heading"><h2>{tr(d.Language,"library.datasets")}</h2><span class="count-label">{fmt.Sprint(len(d.Datasets))}</span></div>
+   if len(d.Datasets)==0 {
+    @EmptyState("▥",tr(d.Language,"library.empty.datasets.title"),tr(d.Language,"library.empty.datasets.text"))
+   } else {
+    <div class="card-list">
+     for _,dataset:=range d.Datasets {
+      @DatasetCard(dataset,false,d.Language)
+     }
+    </div>
+   }
+  </section>
+  <section class="library-section"><div class="list-heading"><h2>{tr(d.Language,"library.music")}</h2><span class="count-label">{fmt.Sprint(len(d.Music))}</span></div>
+   if len(d.Music)==0 {
+    @EmptyState("♫",tr(d.Language,"library.empty.music.title"),tr(d.Language,"library.empty.music.text"))
+   } else {
+    <div class="card-list">
+     for _,music:=range d.Music {
+      @MusicCard(music,false,d.Language)
+     }
+    </div>
+   }
+  </section>
+ </section>
+}
+
+templ DatasetCard(item DatasetItem,admin bool,language string) {
+ <article class="item-card library-item"><div class="item-main"><div class="resource-tags">
+   if item.System {
+    <span class="resource-tag">{tr(language,"library.common")}</span>
+   } else {
+    <span class="resource-tag personal-tag">{tr(language,"library.personal")}</span>
+   }
+   if admin && !item.Active {
+    <span class="resource-tag archived-tag">{tr(language,"library.archived")}</span>
+   }
+  </div><h2>{datasetDisplayTitle(language, item.Title, item.System)}</h2><p>{item.Detail}</p>
+  if !admin {
+   <a class="inline-link" href={templ.SafeURL(fmt.Sprintf("/studio?dataset_id=%d",item.ID))} hx-get={fmt.Sprintf("/studio?dataset_id=%d",item.ID)} hx-target="#studio" hx-swap="outerHTML show:window:top" hx-push-url="true">{tr(language,"library.create")}</a>
+  }
+  </div>
+  if admin {
+   <div class="resource-actions">
+    if item.CanPublish {
+     <form action={routeID("/admin/datasets",item.ID,"/publish")} method="post" hx-post={routeID("/admin/datasets",item.ID,"/publish")} hx-target="#studio" hx-swap="outerHTML" hx-disabled-elt="find button"><button class="text-button" type="submit">{tr(language,"library.publish")}</button></form>
+    }
+   </div>
+  } else if item.CanDelete {
+   <form action={routeID("/datasets",item.ID,"/delete")} method="post" hx-post={routeID("/datasets",item.ID,"/delete")} hx-target="#studio" hx-swap="outerHTML" hx-disabled-elt="find button" data-confirm={tr(language,"library.delete.dataset")}><button class="icon-button danger-text" type="submit" aria-label={tr(language,"library.delete.dataset")}>×</button></form>
+  }
+ </article>
+}
+
+templ MusicCard(item MusicItem,admin bool,language string) {
+ <article class="item-card music-item"><div class="music-top"><div class="item-main"><div class="resource-tags">
+    if item.System {
+     <span class="resource-tag">{tr(language,"library.common")}</span>
+    } else {
+     <span class="resource-tag personal-tag">{tr(language,"library.personal")}</span>
+    }
+    if admin && !item.Active {
+     <span class="resource-tag archived-tag">{tr(language,"library.archived")}</span>
+    }
+   </div><h2>{item.Title}</h2><p>{item.Detail}</p></div>
+   if !admin && item.CanDelete {
+    <form action={routeID("/music",item.ID,"/delete")} method="post" hx-post={routeID("/music",item.ID,"/delete")} hx-target="#studio" hx-swap="outerHTML" hx-disabled-elt="find button" data-confirm={tr(language,"library.delete.music")}><button class="icon-button danger-text" type="submit" aria-label={tr(language,"library.delete.music")}>×</button></form>
+   }
+  </div>
+  if item.URL!="" {
+   <audio class="audio-preview" controls preload="none" src={templ.SafeURL(item.URL)} aria-label={tr(language,"library.listen")}></audio>
+  }
+  if admin {
+   <div class="resource-actions">
+    <form action={routeID("/admin/music",item.ID,"/toggle")} method="post" hx-post={routeID("/admin/music",item.ID,"/toggle")} hx-target="#studio" hx-swap="outerHTML" hx-disabled-elt="find button"><button class="text-button" type="submit">{tr(language,ternaryKey(item.Active,"library.archive","library.restore"))}</button></form>
+    if item.CanPublish {
+     <form action={routeID("/admin/music",item.ID,"/publish")} method="post" hx-post={routeID("/admin/music",item.ID,"/publish")} hx-target="#studio" hx-swap="outerHTML" hx-disabled-elt="find button"><button class="text-button" type="submit">{tr(language,"library.publish")}</button></form>
+    }
+   </div>
+  }
+ </article>
+}

@@ -1,0 +1,98 @@
+package views
+
+import "fmt"
+
+templ Orders(d OrdersData) {
+	<section id="studio" aria-live="polite">
+		@Navigation("status", d.PageData)
+		@Feedback(d.PageData)
+		@PageHeading(tr(d.Language,"status.kicker"), tr(d.Language,"status.title"), tr(d.Language,"status.lead"))
+		if len(d.Orders)==0 {
+			@EmptyState("↗",tr(d.Language,"status.empty.title"),tr(d.Language,"status.empty.text"))
+			<a class="primary-button" href="/studio" hx-get="/studio" hx-target="#studio" hx-swap="outerHTML show:window:top" hx-push-url="true"><span>{tr(d.Language,"status.create")}</span><span>↗</span></a>
+		} else {
+			<div id="orders-list" class="order-list">
+				for _,order:=range d.Orders {
+					@OrderCard(order,false,d.Language)
+				}
+			</div>
+		}
+	</section>
+}
+
+templ OrderCard(order Order,admin bool,language string) {
+	<article class="order-card">
+		<header class="order-heading"><div><span class="card-kicker">{fmt.Sprintf(tr(language,"status.order"),orderNumber(order))}</span><p>{order.CreatedAt}</p></div><div class="order-heading-right">
+			if admin {
+				<strong>{order.Total}</strong>
+			}
+			<span class={statusClass(order.Status)}>{orderLabel(order.Status,language)}</span>
+		</div></header>
+		if admin && order.Payment!="" {
+			<p class="order-payment">{order.Payment}</p>
+		}
+		<div class="job-list">
+			for _,job:=range order.Jobs {
+				@JobCard(job,admin,language)
+			}
+		</div>
+	</article>
+}
+
+templ JobCard(job Job,admin bool,language string) {
+	<article id={fmt.Sprintf("job-%d",job.ID)} class={"job-card", "status-card", jobStateClass(job.Status)}>
+		<div class="job-top"><div><h2>{job.Title}</h2><p>{job.Theme}
+			if job.Music!="" {
+				· {job.Music}
+			}
+		</p></div><div class="job-status-badges" aria-live="polite">
+			<span class={"status", "status-pending", "job-status-badge", "job-status-pending"}>{tr(language,"job.pending")}</span>
+			<span class={"status", "status-processing", "job-status-badge", "job-status-processing"}>{tr(language,"job.processing")}</span>
+			<span class={"status", "status-completed", "job-status-badge", "job-status-completed"}>{tr(language,"job.completed")}</span>
+			<span class={"status", "status-failed", "job-status-badge", "job-status-failed"}>{tr(language,"job.failed")}</span>
+		</div></div>
+		if job.Status=="PENDING" || job.Status=="PROCESSING" {
+			<div id={fmt.Sprintf("render-loading-%d",job.ID)} class="render-loading" role="status" aria-live="polite">
+				<div class="render-loader" aria-hidden="true"><span></span></div>
+				<div class="render-loading-copy">
+					<span class="render-copy-pending"><strong>{tr(language,"status.loading.pending")}</strong><small>{tr(language,"status.loading.pending.text")}</small></span>
+					<span class="render-copy-processing"><strong>{tr(language,"status.loading.processing")}</strong><small>{tr(language,"status.loading.processing.text")}</small></span>
+				</div>
+				<div class="render-progress" aria-hidden="true"><span></span></div>
+				<div class="render-loading-foot"><span class="render-live-dot"></span><span>{tr(language,"status.loading.foot")}</span></div>
+			</div>
+		}
+		@JobState(job,admin,language)
+	</article>
+}
+
+templ JobState(job Job,admin bool,language string) {
+	<div id={fmt.Sprintf("job-state-%d",job.ID)} class="job-state-region" data-job-status={job.Status} hx-get={jobPollURL(job.ID,admin)} hx-trigger={jobPollTrigger(job.Status)} hx-target="this" hx-swap="outerHTML" aria-live="polite">
+		<div class="status-timeline" aria-label={tr(language,"status.kicker")}>
+			<div class={"timeline-step", jobStepClass(job,1)}><span class="timeline-mark">{jobStepIcon(job,1)}</span><div><strong>{jobStepText(job,1,language)}</strong><small>{tr(language,"status.settings")}</small></div></div>
+			<div class={"timeline-step", jobStepClass(job,2)}><span class="timeline-mark">{jobStepIcon(job,2)}</span><div><strong>{jobStepText(job,2,language)}</strong><small>{tr(language,"status.format")}</small></div></div>
+			<div class={"timeline-step", jobStepClass(job,3)}><span class="timeline-mark">{jobStepIcon(job,3)}</span><div><strong>{jobStepText(job,3,language)}</strong><small>{tr(language,"status.telegram")}</small></div></div>
+		</div>
+		if job.Status=="FAILED" {
+			<div class="job-error"><p>
+				if job.Error!="" {
+					{job.Error}
+				} else {
+					{tr(language,"status.failed")}
+				}
+			</p></div>
+			<form action={jobActionURL(job.ID,admin,"retry")} method="post" hx-post={jobActionURL(job.ID,admin,"retry")} hx-target="#studio" hx-swap="outerHTML" hx-disabled-elt="find button"><button class="secondary-button" type="submit">{tr(language,"status.retry.create")} <span>↻</span></button></form>
+		}
+		if job.Status=="COMPLETED" {
+			if job.DownloadURL!="" {
+				<div class="job-actions"><a class="secondary-button" href={templ.SafeURL(job.DownloadURL)} download>{tr(language,"status.download")} <span>↓</span></a></div>
+			}
+			if !admin && job.TelegramSent {
+				<div class="delivery-note delivered"><span>✓</span><p><strong>{tr(language,"status.sent.title")}</strong>{tr(language,"status.sent.text")}</p></div>
+			} else if !admin && job.CanSendTelegram {
+				<div class="delivery-note"><span>…</span><p><strong>{tr(language,"status.retry.title")}</strong>{tr(language,"status.retry.text")}</p></div>
+				<form class="delivery-retry" action={routeID("/jobs",job.ID,"/telegram")} method="post" hx-post={routeID("/jobs",job.ID,"/telegram")} hx-target="#studio" hx-swap="outerHTML" hx-disabled-elt="find button"><button class="text-button" type="submit">{tr(language,"status.retry.button")}</button></form>
+			}
+		}
+	</div>
+}

@@ -89,9 +89,9 @@ func localeBase(language string) string {
 		language = language[:index]
 	}
 	switch language {
-	case "ru", "en", "uk", "be", "pl":
+	case "ru", "en", "uk", "be", "pl", "de":
 		return language
-	case "de", "es", "fr", "it", "pt", "tr", "ar", "id", "vi", "ja", "ko", "zh", "nl", "cs", "sv":
+	case "es", "fr", "it", "pt", "tr", "ar", "id", "vi", "ja", "ko", "zh", "nl", "cs", "sv":
 		// The catalog has a complete English fallback for the additional UI
 		// locales. Their chrome can grow independently of the seeded catalog.
 		return "en"
@@ -116,6 +116,14 @@ var datasetTranslations = map[string]map[string]string{
 		"population-countries": "Population by country · 2015–2024 (million people)",
 		"co2-per-capita":       "CO₂ emissions per person · 2015–2024 (tonnes)",
 		"renewable-share":      "Renewable energy · 2015–2024 (% of final consumption)",
+	},
+	"de": {
+		"platform-sales":       "Verkäufe von Spielekonsolen · 2015–2024 (Mio. Geräte)",
+		"streaming-genres":     "Musikgenres im Streaming · 2015–2024 (%)",
+		"renewables-growth":    "Wachstum erneuerbarer Energien · 2015–2024 (%)",
+		"population-countries": "Bevölkerung nach Ländern · 2015–2024 (Mio. Menschen)",
+		"co2-per-capita":       "CO₂-Emissionen pro Person · 2015–2024 (Tonnen)",
+		"renewable-share":      "Erneuerbare Energien · 2015–2024 (% des Endverbrauchs)",
 	},
 	"uk": {
 		"platform-sales":       "Продажі ігрових платформ · 2015–2024 (млн пристроїв)",

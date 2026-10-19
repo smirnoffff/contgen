@@ -16,10 +16,13 @@ func TestKeyForTitleSupportsCurrentAndLegacyNames(t *testing.T) {
 	}
 }
 
-func TestLocalizedTitleUsesEnglishFallbackForAdditionalLocales(t *testing.T) {
+func TestLocalizedTitleUsesLocaleAndEnglishFallback(t *testing.T) {
 	title := "Продажи игровых платформ · 2015–2024 (млн устройств)"
-	if got := LocalizedTitle(title, "de-DE"); got != "Game platform sales · 2015–2024 (million devices)" {
-		t.Fatalf("German fallback title = %q", got)
+	if got := LocalizedTitle(title, "de-DE"); got != "Verkäufe von Spielekonsolen · 2015–2024 (Mio. Geräte)" {
+		t.Fatalf("German title = %q", got)
+	}
+	if got := LocalizedTitle(title, "fr-FR"); got != "Game platform sales · 2015–2024 (million devices)" {
+		t.Fatalf("French fallback title = %q", got)
 	}
 	if got := LocalizedTitle(title, "xx"); got != title {
 		t.Fatalf("unknown locale should use canonical title, got %q", got)

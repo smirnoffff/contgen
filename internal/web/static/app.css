@@ -1185,6 +1185,26 @@ html { scroll-behavior: smooth; }
   .app-nav a.is-active { animation: none; }
 }
 
+/* Keep the twenty-language picker inside the Mini App viewport. */
+.language-menu-list {
+  width: min(232px, calc(100vw - 36px));
+  min-width: 0;
+  max-height: calc(100vh - 150px);
+  max-height: min(300px, calc(100dvh - 150px));
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #637356 transparent;
+}
+.language-menu-list::-webkit-scrollbar { width: 5px; }
+.language-menu-list::-webkit-scrollbar-thumb { border-radius: 99px; background: #637356; }
+.language-menu-list a { min-height: 34px; }
+@media (max-width: 370px) {
+  .language-menu-list { width: calc(100vw - 30px); max-height: min(270px, calc(100dvh - 138px)); }
+}
+
 /* Ads payment: the meter explains progress across every video in the cart. */
 .ad-payment-head > strong {
   min-width: 58px;

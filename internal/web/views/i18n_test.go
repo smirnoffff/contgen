@@ -44,6 +44,12 @@ func TestTranslationsFallbackForPartialLocale(t *testing.T) {
 	if got := tr("uk", "welcome.retry"); got == "welcome.retry" || got == "" {
 		t.Fatalf("missing key did not fall back to a readable translation: %q", got)
 	}
+	if got := tr("de", "status.title"); got != "Dein Video ist unterwegs." {
+		t.Fatalf("German status translation = %q", got)
+	}
+	if got := tr("de", "cart.pay"); got != "Jetzt bezahlen" {
+		t.Fatalf("German checkout translation = %q", got)
+	}
 }
 
 func TestSystemDatasetTitlesAreLocalizedWithoutTouchingPersonalTitles(t *testing.T) {

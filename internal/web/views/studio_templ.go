@@ -57,7 +57,7 @@ func Page(devLogin bool, authenticated bool, language string, adsGramBlockID str
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</title><link rel=\"stylesheet\" href=\"/static/app.css\"><script src=\"https://telegram.org/js/telegram-web-app.js\" defer></script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</title><link rel=\"stylesheet\" href=\"/static/app.css?v=20261019-de\"><script src=\"https://telegram.org/js/telegram-web-app.js\" defer></script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -67,7 +67,7 @@ func Page(devLogin bool, authenticated bool, language string, adsGramBlockID str
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<script src=\"/static/htmx.min.js\" defer></script><script src=\"/static/app.js\" defer></script></head><body data-authenticated=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<script src=\"/static/htmx.min.js\" defer></script><script src=\"/static/app.js?v=20261019-de\" defer></script></head><body data-authenticated=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

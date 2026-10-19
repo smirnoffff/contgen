@@ -11,13 +11,13 @@ templ Page(devLogin bool, authenticated bool, language string, adsGramBlockID st
 			<meta name="color-scheme" content="dark light"/>
 			<meta name="htmx-config" content='{"allowEval":false,"allowScriptTags":false,"historyCacheSize":0}'/>
 			<title>{tr(language,"page.title")}</title>
-			<link rel="stylesheet" href="/static/app.css?v=20261019-de"/>
+			<link rel="stylesheet" href="/static/app.css?v=20261019-ui3"/>
 			<script src="https://telegram.org/js/telegram-web-app.js" defer></script>
 			if adsGramBlockID != "" {
 				<script src="https://sad.adsgram.ai/js/sad.min.js" defer></script>
 			}
 			<script src="/static/htmx.min.js" defer></script>
-			<script src="/static/app.js?v=20261019-de" defer></script>
+			<script src="/static/app.js?v=20261019-ui3" defer></script>
 		</head>
 		<body data-authenticated={ fmt.Sprint(authenticated) } data-local-demo={ fmt.Sprint(devLogin) } data-adsgram-block-id={ adsGramBlockID } data-adsgram-debug={ fmt.Sprint(adsGramDebug) }>
 			<div class="app-shell">
@@ -80,7 +80,7 @@ templ Studio(d StudioData) {
 							}
 						</select>
 						if d.Selected != nil {
-							<div class="dataset-caption"><span class="tiny-dot"></span><span>{ d.Period() } · { fmt.Sprint(d.PointCount) } точек</span></div>
+							<div class="dataset-caption"><span class="tiny-dot"></span><span>{ d.Period() } · { pointsLabel(d) }</span></div>
 						}
 					}
 				</section>
@@ -99,16 +99,16 @@ templ Studio(d StudioData) {
 						}
 						</div>
 					</section>
-					<aside class="preview-area" aria-label="Предпросмотр выбранных данных">
+					<aside class="preview-area" aria-label={tr(d.Language,"studio.preview.aria")}>
 						<div class="preview-heading"><span class="card-kicker">{tr(d.Language,"studio.preview")}</span><span class="frame-tag">9:16</span></div>
 						<div class="preview-frame" style={ d.PreviewStyle } data-theme={ string(d.Theme) }>
 							<div class="frame-grid"></div>
 							<div class="frame-content">
-								<div class="frame-top"><span>CONTGEN</span><span>DATA / STORY</span></div>
+								<div class="frame-top"><span>CONTGEN</span><span>{tr(d.Language,"studio.preview.data")}</span></div>
 								if d.Selected != nil {
 									<h3>{ datasetDisplayTitle(d.Language, d.Selected.Title, d.Selected.UserID == nil) }</h3>
 								} else {
-									<h3>Твоя следующая<br/>история</h3>
+									<h3>{tr(d.Language,"studio.preview.empty.title")}</h3>
 								}
 								<div class="frame-subtitle">{ d.Period() }</div>
 								if len(d.Bars) > 0 {
@@ -120,7 +120,7 @@ templ Studio(d StudioData) {
 								} else {
 									<div class="preview-empty">{ previewMessage(d) }</div>
 								}
-								<div class="frame-bottom"><span>ПОСЛЕДНИЙ КАДР</span><strong>{ lastYear(d) }</strong></div>
+								<div class="frame-bottom"><span>{tr(d.Language,"studio.preview.last")}</span><strong>{ lastYear(d) }</strong></div>
 							</div>
 						</div>
 						<p class="preview-note">{tr(d.Language,"studio.preview.note")}</p>

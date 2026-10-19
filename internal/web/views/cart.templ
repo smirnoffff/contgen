@@ -11,7 +11,9 @@ templ Cart(d CartData) {
 			@EmptyState("⌑",tr(d.Language,"cart.empty.title"),tr(d.Language,"cart.empty.text"))
 			<a class="primary-button" href="/studio" hx-get="/studio" hx-target="#studio" hx-swap="outerHTML show:window:top" hx-push-url="true"><span>{tr(d.Language,"cart.configure")}</span><span>↗</span></a>
 		} else {
+			<div class="cart-welcome"><div class="cart-welcome-mark" aria-hidden="true">✓</div><div class="cart-welcome-copy"><span class="card-kicker">{tr(d.Language,"cart.ready.kicker")}</span><h2>{tr(d.Language,"cart.ready.title")}</h2><p>{tr(d.Language,"cart.ready.text")}</p></div><span class="cart-welcome-count">{cartCountLabel(d.Language,len(d.Items))}</span></div>
 			<div class="cart-overview"><div><span class="card-kicker">{tr(d.Language,"cart.in.order")}</span><strong>{cartCountLabel(d.Language,len(d.Items))}</strong><small>{tr(d.Language,"cart.overview.hint")}</small></div><span class="cart-overview-price">{d.Total}</span></div>
+			<div class="cart-section-heading"><span>{tr(d.Language,"cart.videos")}</span><span>{len(d.Items)}</span></div>
 			<div class="card-list cart-items">
 				for i,item:=range d.Items {
 					<article class="item-card cart-item"><span class="item-index">{fmt.Sprintf("%02d",i+1)}</span><div class="item-main"><h2>{item.Title}</h2><p>{item.Theme}</p><span class="detail-text">
@@ -25,7 +27,7 @@ templ Cart(d CartData) {
 			</div>
 			<form class="checkout-card" action="/cart/checkout" method="post" hx-post="/cart/checkout" hx-disabled-elt="find button">
 				<input type="hidden" name="order_id" value={fmt.Sprint(d.OrderID)}/>
-				<div class="checkout-intro"><div><span class="card-kicker">{tr(d.Language,"cart.payment.aria")}</span><strong>{tr(d.Language,"cart.pay.choose")}</strong></div><span>{d.Total}</span></div>
+				<div class="checkout-intro"><div><span class="card-kicker">{tr(d.Language,"cart.payment.kicker")}</span><strong>{tr(d.Language,"cart.pay.choose")}</strong></div><span>{d.Total}</span></div>
 				<div class="payment-methods" role="radiogroup" aria-label={tr(d.Language,"cart.payment.aria")}>
 					<label class={"payment-method", templ.KV("is-selected", d.AdsEnabled), templ.KV("is-unavailable", !d.AdsEnabled)} data-payment-choice-card>
 						<input type="radio" name="payment_method" value="ADS" checked?={d.AdsEnabled} disabled?={!d.AdsEnabled} data-payment-choice/>

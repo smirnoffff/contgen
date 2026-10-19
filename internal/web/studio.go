@@ -72,18 +72,18 @@ func (s *server) studioData(r *http.Request, user dbgen.User) (views.StudioData,
 		d.Selected = &d.Datasets[0]
 	}
 	names := map[dbgen.RenderTheme][2]string{
-		dbgen.RenderThemeDARKGLASS:      {"Dark Glass", "Тёплый свет, тёмное стекло"},
-		dbgen.RenderThemeCORPORATELIGHT: {"Corporate Light", "Чистая редакционная подача"},
-		dbgen.RenderThemeCYBERHUD:       {"Cyber HUD", "Неон и цифровая точность"},
-		dbgen.RenderThemeVINTAGEPRINT:   {"Vintage Print", "Бумага, цвет и характер"},
+		dbgen.RenderThemeDARKGLASS:      {"theme.dark.name", "theme.dark.description"},
+		dbgen.RenderThemeCORPORATELIGHT: {"theme.corporate.name", "theme.corporate.description"},
+		dbgen.RenderThemeCYBERHUD:       {"theme.cyber.name", "theme.cyber.description"},
+		dbgen.RenderThemeVINTAGEPRINT:   {"theme.vintage.name", "theme.vintage.description"},
 	}
 	for _, code := range dbgen.AllRenderThemeValues() {
 		name := names[code]
 		if name[0] == "" {
-			name = [2]string{string(code), "Новая тема"}
+			name = [2]string{string(code), "theme.new.description"}
 		}
 		palette := renderer.GetPalette(code)
-		d.Themes = append(d.Themes, views.Theme{Code: code, Name: name[0], Description: name[1], Swatches: palette.BarColors[:4]})
+		d.Themes = append(d.Themes, views.Theme{Code: code, Name: views.Translate(d.Language, name[0]), Description: views.Translate(d.Language, name[1]), Swatches: palette.BarColors[:4]})
 	}
 	palette := renderer.GetPalette(d.Theme)
 	d.PreviewStyle = fmt.Sprintf("--preview-bg:%s;--preview-text:%s;--preview-sub:%s;--preview-card:%s;--preview-accent:%s", palette.BgColor, palette.TextColor, palette.SubTextColor, palette.CardColor, palette.AccentColor)

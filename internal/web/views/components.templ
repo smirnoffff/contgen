@@ -24,6 +24,7 @@ templ Navigation(active string, d PageData) {
  <details class="language-menu">
   <summary class="language-toggle" aria-label={tr(d.Language,"nav.language")}><span aria-hidden="true">文</span><span>{d.CurrentLanguageLabel()}</span><span class="language-chevron" aria-hidden="true">⌄</span></summary>
   <div class="language-menu-list" role="menu">
+   <div class="language-menu-head"><span>{tr(d.Language,"nav.language.title")}</span><small>{tr(d.Language,"nav.language.hint")}</small></div>
    for _, option := range d.LanguageOptions() {
     <a role="menuitem" href={templ.SafeURL("/language?lang="+option.Code)}>{option.NativeName}<small>{option.Name}</small></a>
    }

@@ -72,3 +72,7 @@ func lastYear(d StudioData) string {
 	}
 	return fmt.Sprint(d.LastYear)
 }
+
+func pointsLabel(d StudioData) string {
+	return fmt.Sprintf(tr(d.Language, "studio.points.short"), d.PointCount)
+}

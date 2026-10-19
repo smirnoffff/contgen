@@ -50,6 +50,12 @@ func TestTranslationsFallbackForPartialLocale(t *testing.T) {
 	if got := tr("de", "cart.pay"); got != "Jetzt bezahlen" {
 		t.Fatalf("German checkout translation = %q", got)
 	}
+	if got := tr("de", "theme.dark.description"); got != "Warmes Licht, dunkles Glas" {
+		t.Fatalf("German theme description = %q", got)
+	}
+	if got := tr("uk", "studio.preview.data"); got != "ДАНІ / ІСТОРІЯ" {
+		t.Fatalf("Ukrainian preview label = %q", got)
+	}
 }
 
 func TestSystemDatasetTitlesAreLocalizedWithoutTouchingPersonalTitles(t *testing.T) {

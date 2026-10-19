@@ -157,6 +157,10 @@ func tr(language, key string) string {
 	return translations[string(LanguageRU)][key]
 }
 
+// Translate exposes the same safe fallback used by templates to small
+// presentation helpers that build view models in the web package.
+func Translate(language, key string) string { return tr(language, key) }
+
 var translations = map[string]map[string]string{
 	string(LanguageRU): {
 		"nav.aria": "Разделы студии", "nav.create": "Создать", "nav.library": "Материалы", "nav.order": "Заказ", "nav.admin": "Управление студией", "nav.language": "English",

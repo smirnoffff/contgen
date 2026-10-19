@@ -27,7 +27,8 @@ func (s *server) cart(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	data, err := s.cartData(r.Context(), u)
+	language := s.languageForRequest(r, string(u.Language))
+	data, err := s.cartData(r.Context(), u, language)
 	if err != nil {
 		s.unavailable(w, err)
 		return
@@ -40,7 +41,7 @@ func (s *server) cart(w http.ResponseWriter, r *http.Request) {
 	s.page(w, r, views.Cart(data))
 }
 
-func (s *server) cartData(ctx context.Context, u dbgen.User) (views.CartData, error) {
+func (s *server) cartData(ctx context.Context, u dbgen.User, language string) (views.CartData, error) {
 	items, err := s.db.ListCartItems(ctx, u.ID)
 	if err != nil {
 		return views.CartData{}, err
@@ -50,7 +51,7 @@ func (s *server) cartData(ctx context.Context, u dbgen.User) (views.CartData, er
 		data.OrderID = items[0].RenderJob.OrderID
 	}
 	for _, item := range items {
-		data.Items = append(data.Items, views.CartItem{ID: item.RenderJob.ID, Title: item.DatasetTitle, Theme: themeLabel(item.RenderJob.Theme), Music: musicLabel(item.MusicTitle), Price: fmt.Sprintf("%d ⭐", storage.RenderPrice)})
+		data.Items = append(data.Items, views.CartItem{ID: item.RenderJob.ID, Title: views.DatasetTitle(item.DatasetTitle, language), Theme: themeLabel(item.RenderJob.Theme), Music: musicLabel(item.MusicTitle, language), Price: fmt.Sprintf("%d ⭐", storage.RenderPrice)})
 	}
 	data.Subtotal = fmt.Sprintf("%d ⭐", len(items)*storage.RenderPrice)
 	data.Total = data.Subtotal
@@ -539,6 +540,7 @@ func (s *server) orders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d := views.OrdersData{PageData: page}
+	language := s.languageForRequest(r, string(u.Language))
 	orders, err := s.db.ListUserOrders(r.Context(), u.ID)
 	if err != nil {
 		s.unavailable(w, err)
@@ -551,7 +553,7 @@ func (s *server) orders(w http.ResponseWriter, r *http.Request) {
 	}
 	byOrder := map[int64][]views.Job{}
 	for _, row := range jobs {
-		byOrder[row.RenderJob.OrderID] = append(byOrder[row.RenderJob.OrderID], s.viewJob(row.RenderJob, row.DatasetTitle, row.MusicTitle, u))
+		byOrder[row.RenderJob.OrderID] = append(byOrder[row.RenderJob.OrderID], s.viewJob(row.RenderJob, views.DatasetTitle(row.DatasetTitle, language), row.MusicTitle, u, language))
 	}
 	for _, row := range orders {
 		d.Orders = append(d.Orders, views.Order{ID: row.Order.ID, DisplayNumber: row.OrderNumber, Status: string(row.Order.Status), CreatedAt: row.Order.CreatedAt.Format("02.01.2006 15:04"), Total: numericLabel(row.Order.TotalAmount) + " ⭐", Payment: paymentLabel(row.Order.PaymentMethod), Jobs: byOrder[row.Order.ID]})
@@ -572,8 +574,8 @@ func paymentLabel(p *dbgen.PaymentMethod) string {
 	return string(*p)
 }
 
-func (s *server) viewJob(job dbgen.RenderJob, title string, music *string, u dbgen.User) views.Job {
-	v := views.Job{ID: job.ID, Title: title, Theme: themeLabel(job.Theme), Music: musicLabel(music), Status: string(job.Status), CreatedAt: job.CreatedAt.Format("02.01.2006 15:04"), CanSendTelegram: u.TgID > 0 && s.opts.Telegram != nil && job.TelegramFileID == nil, TelegramSent: job.TelegramFileID != nil}
+func (s *server) viewJob(job dbgen.RenderJob, title string, music *string, u dbgen.User, language string) views.Job {
+	v := views.Job{ID: job.ID, Title: title, Theme: themeLabel(job.Theme), Music: musicLabel(music, language), Status: string(job.Status), CreatedAt: job.CreatedAt.Format("02.01.2006 15:04"), CanSendTelegram: u.TgID > 0 && s.opts.Telegram != nil && job.TelegramFileID == nil, TelegramSent: job.TelegramFileID != nil}
 	if job.ErrorMessage != nil {
 		v.Error = *job.ErrorMessage
 	}
@@ -607,7 +609,8 @@ func (s *server) jobCard(w http.ResponseWriter, r *http.Request) {
 		s.unavailable(w, err)
 		return
 	}
-	render(w, r, views.JobState(s.viewJob(row.RenderJob, row.DatasetTitle, row.MusicTitle, u), false, s.languageForRequest(r, string(u.Language))))
+	language := s.languageForRequest(r, string(u.Language))
+	render(w, r, views.JobState(s.viewJob(row.RenderJob, views.DatasetTitle(row.DatasetTitle, language), row.MusicTitle, u, language), false, language))
 }
 
 func (s *server) video(w http.ResponseWriter, r *http.Request) {
@@ -776,7 +779,8 @@ func (s *server) admin(w http.ResponseWriter, r *http.Request) {
 		}
 		by := map[int64][]views.Job{}
 		for _, v := range jobs {
-			j := s.viewJob(v.RenderJob, v.DatasetTitle, nil, u)
+			language := s.languageForRequest(r, string(u.Language))
+			j := s.viewJob(v.RenderJob, views.DatasetTitle(v.DatasetTitle, language), nil, u, language)
 			j.CanSendTelegram = false
 			by[v.RenderJob.OrderID] = append(by[v.RenderJob.OrderID], j)
 		}
@@ -826,7 +830,8 @@ func (s *server) adminJobCard(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	j := s.viewJob(row.RenderJob, row.DatasetTitle, row.MusicTitle, u)
+	language := s.languageForRequest(r, string(u.Language))
+	j := s.viewJob(row.RenderJob, views.DatasetTitle(row.DatasetTitle, language), row.MusicTitle, u, language)
 	j.CanSendTelegram = false
 	render(w, r, views.JobState(j, true, s.languageForRequest(r, string(u.Language))))
 }
@@ -1032,9 +1037,9 @@ func themeLabel(t dbgen.RenderTheme) string {
 	}
 	return string(t)
 }
-func musicLabel(title *string) string {
+func musicLabel(title *string, language string) string {
 	if title == nil {
-		return "Без музыки"
+		return views.Translate(language, "studio.no.music")
 	}
 	return *title
 }

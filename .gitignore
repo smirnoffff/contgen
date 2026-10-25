@@ -3,6 +3,11 @@
 .env.*
 !.env.example
 *.local
+/secrets/
+auth.json
+credentials*.json
+*.pem
+*.key
 
 # Go tooling and build output
 /bin/

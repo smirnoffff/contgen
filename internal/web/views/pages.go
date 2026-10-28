@@ -118,21 +118,46 @@ type PromoItem struct {
 	Usage    string
 	Expires  string
 	Active   bool
+	State    string
 }
+type AdminOrder struct {
+	Order
+	OwnerName     string
+	OwnerUsername string
+	TelegramID    string
+	LocalDemo     bool
+	ItemCount     int64
+}
+
 type AdminData struct {
 	PageData
-	Tab          string
-	UserCount    int64
-	OrderCount   int64
-	JobCount     int64
-	PendingCount int64
-	FailedCount  int64
-	Revenue      string
-	Users        []AdminUser
-	Orders       []Order
-	Datasets     []DatasetItem
-	Music        []MusicItem
-	Promos       []PromoItem
+	Tab             string
+	UserCount       int64
+	OrderCount      int64
+	JobCount        int64
+	PendingCount    int64
+	FailedCount     int64
+	Revenue         string
+	StarsPayments   int64
+	AdOrders        int64
+	PromoOrders     int64
+	CartCountTotal  int64
+	DeliveredCount  int64
+	QueuedCount     int64
+	ProcessingCount int64
+	IncludeDemo     bool
+	UpdatedAt       string
+	FilterStatus    string
+	Search          string
+	CurrentPage     int
+	TotalOrders     int64
+	HasPrevious     bool
+	HasNext         bool
+	Users           []AdminUser
+	Orders          []AdminOrder
+	Datasets        []DatasetItem
+	Music           []MusicItem
+	Promos          []PromoItem
 }
 
 func datasetDisplayTitle(language, title string, system bool) string {

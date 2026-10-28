@@ -34,10 +34,10 @@ if [[ -f .env ]]; then
     set +a
 fi
 if [[ "${APP_URL:-}" != https://* ]]; then
-    echo 'Укажи в .env APP_URL=https://твой-dev-домен из https://dashboard.ngrok.com/domains' >&2
+    echo 'Укажи в .env APP_URL=https://твой-публичный-домен' >&2
     exit 1
 fi
-task_tunnel_provider="${TUNNEL_PROVIDER:-ngrok}"
+task_tunnel_provider="${TUNNEL_PROVIDER:-tailscale}"
 if [[ "$task_tunnel_provider" != ngrok && "$task_tunnel_provider" != tailscale ]]; then
     echo 'TUNNEL_PROVIDER должен быть ngrok или tailscale.' >&2
     exit 1
@@ -57,10 +57,13 @@ export DEV_LOGIN=false SERVER_HOST=127.0.0.1 SERVER_PORT="${SERVER_PORT:-8080}"
 python3 - "$SERVER_PORT" <<'PY'
 import socket, sys
 try:
-    with socket.create_connection(('127.0.0.1', int(sys.argv[1])), timeout=1):
-        sys.exit('Порт занят. Останови прежний make run через Ctrl+C или выбери другой SERVER_PORT.')
+    # A Windows localhost relay can accept connections after the WSL process
+    # has stopped. Binding checks whether the actual Go listener can start.
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        listener.bind(('127.0.0.1', int(sys.argv[1])))
 except OSError:
-    pass
+    sys.exit('Порт занят. Останови прежний make run через Ctrl+C или выбери другой SERVER_PORT.')
 PY
 
 task_runtime="$(mktemp -d /tmp/contgen-telegram.XXXXXX)"
@@ -91,12 +94,12 @@ for ((task_attempt = 0; task_attempt < 100; task_attempt++)); do
         wait "$task_app_pid"
         exit 1
     fi
-    if curl --fail --silent --max-time 1 "http://127.0.0.1:$SERVER_PORT/healthz" -o /dev/null; then
+    if curl --noproxy '*' --fail --silent --max-time 1 "http://127.0.0.1:$SERVER_PORT/healthz" -o /dev/null; then
         break
     fi
     sleep 0.1
 done
-if ! curl --fail --silent --max-time 1 "http://127.0.0.1:$SERVER_PORT/healthz" -o /dev/null; then
+if ! curl --noproxy '*' --fail --silent --max-time 1 "http://127.0.0.1:$SERVER_PORT/healthz" -o /dev/null; then
     echo 'Приложение не запустилось за 10 секунд.' >&2
     exit 1
 fi

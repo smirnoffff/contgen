@@ -7,111 +7,142 @@ templ Admin(d AdminData) {
   @Navigation("admin",d.PageData)
   @Feedback(d.PageData)
   <div class="admin-shell">
-   <header class="admin-hero">
-    <div class="admin-hero-copy">
-    <span class="eyebrow">{tr(d.Language,"admin.kicker")}</span>
-    <h1>{tr(d.Language,"admin.title")}</h1>
-    <p class="lead">{tr(d.Language,"admin.lead")}</p>
-    </div>
-    <span class="admin-live"><i aria-hidden="true"></i>{tr(d.Language,"admin.online")}</span>
-   </header>
-   <nav class="admin-tabs" aria-label={tr(d.Language,"admin.nav")} role="tablist">
+   <header class="admin-hero"><div class="admin-hero-copy"><span class="eyebrow">{tr(d.Language,"admin.kicker")}</span><h1>{tr(d.Language,"admin.title")}</h1><p class="lead">{tr(d.Language,"admin.lead")}</p></div><span class="admin-live">{tr(d.Language,"admin.role.admin")}</span></header>
+   <nav class="admin-tabs" aria-label={tr(d.Language,"admin.nav")}>
     for _,tab:=range adminTabs(d.Language) {
-     <a role="tab" href={templ.SafeURL("/admin?tab="+tab.Code)} hx-get={"/admin?tab="+tab.Code} hx-target="#studio" hx-swap="outerHTML" class={templ.KV("is-active",adminTab(d.Tab)==tab.Code)} aria-current={currentPage(adminTab(d.Tab),tab.Code)} aria-selected={fmt.Sprint(adminTab(d.Tab)==tab.Code)}>{tab.Label}</a>
+     <a href={templ.SafeURL(d.URL(tab.Code))} hx-get={d.URL(tab.Code)} hx-target="#studio" hx-swap="outerHTML" hx-push-url="true" class={templ.KV("is-active",d.Tab==tab.Code)} aria-current={currentPage(d.Tab,tab.Code)}>{tab.Label}</a>
     }
    </nav>
+   <div class="admin-toolbar"><a class={"admin-scope",templ.KV("is-demo",d.IncludeDemo)} href={templ.SafeURL(d.DemoURL())} hx-get={d.DemoURL()} hx-target="#studio" hx-swap="outerHTML" hx-push-url="true"><span class="admin-scope-dot" aria-hidden="true"></span>{tr(d.Language,ternaryKey(d.IncludeDemo,"admin.scope.all","admin.scope.real"))}<span aria-hidden="true">⌄</span></a><a class="admin-refresh" href={templ.SafeURL(d.CurrentURL())} hx-get={d.CurrentURL()} hx-target="#studio" hx-swap="outerHTML">{tr(d.Language,"admin.refresh")} <span aria-hidden="true">↻</span></a></div>
+   if d.IncludeDemo {
+    <p class="admin-scope-note">{tr(d.Language,"admin.scope.demo.hint")}</p>
+   }
    <div class="admin-content">
-   switch adminTab(d.Tab) {
-   case "overview":
-    <section class="admin-section admin-overview" aria-labelledby="overview-title">
-     <div class="admin-section-heading"><div><span class="card-kicker">{tr(d.Language,"admin.today")}</span><h2 id="overview-title">{tr(d.Language,"admin.summary")}</h2></div><span class="admin-section-caption">{tr(d.Language,"admin.update")}</span></div>
-     <div class="metrics-grid">
-      <div class="metric-card"><span class="metric-icon" aria-hidden="true">♙</span><div><span>{tr(d.Language,"admin.users.count")}</span><strong>{fmt.Sprint(d.UserCount)}</strong></div></div>
-      <div class="metric-card"><span class="metric-icon" aria-hidden="true">⌑</span><div><span>{tr(d.Language,"admin.orders.count")}</span><strong>{fmt.Sprint(d.OrderCount)}</strong></div></div>
-      <div class="metric-card"><span class="metric-icon" aria-hidden="true">◈</span><div><span>{tr(d.Language,"admin.jobs.count")}</span><strong>{fmt.Sprint(d.JobCount)}</strong></div></div>
-      <div class="metric-card metric-card-accent"><span class="metric-icon" aria-hidden="true">↗</span><div><span>{tr(d.Language,"admin.pending")}</span><strong>{fmt.Sprint(d.PendingCount)}</strong></div></div>
-     </div>
-     <div class="overview-note"><div><span class="card-kicker">{tr(d.Language,"admin.paid")}</span><strong>{d.Revenue}</strong></div><p>{tr(d.Language,"admin.revenue")}</p></div>
-    </section>
-    if d.FailedCount>0 {
-     <a class="notice warning-notice" href="/admin?tab=orders" hx-get="/admin?tab=orders" hx-target="#studio" hx-swap="outerHTML" hx-push-url="true">{tr(d.Language,"admin.retry")}: {fmt.Sprint(d.FailedCount)} <span>↗</span></a>
-    }
-    <div class="admin-guide"><span class="card-kicker">{tr(d.Language,"admin.workflow")}</span><h2>{tr(d.Language,"admin.workflow.title")}</h2><p>{tr(d.Language,"admin.lead")}</p></div>
-   case "library":
-     <section class="admin-section admin-library" aria-labelledby="library-title">
-     <div class="admin-section-heading"><div><span class="card-kicker">{tr(d.Language,"library.kicker")}</span><h2 id="library-title">{tr(d.Language,"library.title")}</h2></div><span class="admin-section-caption">{tr(d.Language,"admin.library.access")}</span></div>
-     <div class="admin-upload-grid"><details class="upload-disclosure"><summary><span><b>↑</b> {tr(d.Language,"admin.add.dataset")}</span><span>+</span></summary>@UploadForm("datasets",true,d.Language)</details>
-     <details class="upload-disclosure"><summary><span><b>♫</b> {tr(d.Language,"admin.add.music")}</span><span>+</span></summary>@UploadForm("music",true,d.Language)</details></div>
-    <section class="library-section"><div class="list-heading"><h2>{tr(d.Language,"library.datasets")}</h2><span class="count-label">{fmt.Sprint(len(d.Datasets))}</span></div><div class="card-list">
-     for _,item:=range d.Datasets {
-      @DatasetCard(item,true,d.Language)
-     }
-     if len(d.Datasets)==0 {
-      @EmptyState("▥",tr(d.Language,"admin.dataset.empty.title"),tr(d.Language,"admin.dataset.empty.text"))
-     }
-    </div></section>
-    <section class="library-section"><div class="list-heading"><h2>{tr(d.Language,"library.music")}</h2><span class="count-label">{fmt.Sprint(len(d.Music))}</span></div><div class="card-list">
-     for _,item:=range d.Music {
-      @MusicCard(item,true,d.Language)
-     }
-     if len(d.Music)==0 {
-      @EmptyState("♫",tr(d.Language,"admin.music.empty.title"),tr(d.Language,"admin.music.empty.text"))
-     }
-    </div></section>
-    </section>
-   case "users":
-    <section class="admin-section admin-users" aria-labelledby="users-title"><div class="admin-section-heading"><div><span class="card-kicker">{tr(d.Language,"admin.access")}</span><h2 id="users-title">{tr(d.Language,"admin.users")}</h2></div><span class="admin-section-caption">{fmt.Sprintf(tr(d.Language,"admin.accounts"),d.UserCount)}</span></div><div class="card-list">
-     for _,u:=range d.Users {
-      <article class="item-card user-card"><div class="user-avatar" aria-hidden="true">{initial(u.Name)}</div><div class="item-main"><h2>{u.Name}</h2><p>{u.Username}</p><span class="detail-text">Telegram {u.TelegramID} · {u.JoinedAt}</span>
-       if u.IsSelf {
-        <span class="resource-tag personal-tag">Твой аккаунт · администратор</span>
-       } else {
-        <form class="role-form" action={routeID("/admin/users",u.ID,"/role")} method="post" hx-post={routeID("/admin/users",u.ID,"/role")} hx-target="#studio" hx-swap="outerHTML" hx-disabled-elt="find button">
-         <label class="sr-only" for={fmt.Sprintf("role-%d",u.ID)}>Роль {u.Name}</label><select id={fmt.Sprintf("role-%d",u.ID)} name="role"><option value="USER" selected?={u.Role=="USER"}>Пользователь</option><option value="ADMIN" selected?={u.Role=="ADMIN"}>Администратор</option></select><button class="compact-button" type="submit">Сохранить</button>
-        </form>
+    switch d.Tab {
+    case "overview":
+     <section class="admin-section admin-overview" aria-labelledby="overview-title">
+      <div class="admin-section-heading"><div><span class="card-kicker">{tr(d.Language,"admin.period.all")}</span><h2 id="overview-title">{tr(d.Language,"admin.summary")}</h2></div><span class="admin-section-caption">{tr(d.Language,"admin.snapshot")} {d.UpdatedAt}</span></div>
+      <div class="admin-revenue-card"><span class="card-kicker">{tr(d.Language,"admin.stars.received")}</span><strong>{d.Revenue}</strong><span class="admin-revenue-count">{fmt.Sprintf(tr(d.Language,"admin.stars.payments"),d.StarsPayments)}</span><p>{tr(d.Language,"admin.stars.hint")}</p></div>
+      <div class="admin-method-grid"><div><span aria-hidden="true">▷</span><strong>{fmt.Sprint(d.AdOrders)}</strong><span>{tr(d.Language,"admin.ad.orders")}</span></div><div><span aria-hidden="true">%</span><strong>{fmt.Sprint(d.PromoOrders)}</strong><span>{tr(d.Language,"admin.promo.orders")}</span></div></div>
+      <div class="metrics-grid">
+       <div class="metric-card"><div><span>{tr(d.Language,"admin.users.count")}</span><strong>{fmt.Sprint(d.UserCount)}</strong></div></div>
+       <div class="metric-card"><div><span>{tr(d.Language,"admin.orders.placed")}</span><strong>{fmt.Sprint(d.OrderCount)}</strong></div></div>
+       <div class="metric-card"><div><span>{tr(d.Language,"admin.jobs.count")}</span><strong>{fmt.Sprint(d.JobCount)}</strong></div></div>
+       <div class="metric-card"><div><span>{tr(d.Language,"admin.delivered")}</span><strong>{fmt.Sprint(d.DeliveredCount)}</strong></div></div>
+      </div>
+      <a class="admin-queue-card" href={templ.SafeURL(d.URL("orders"))} hx-get={d.URL("orders")} hx-target="#studio" hx-swap="outerHTML" hx-push-url="true"><div><span class="card-kicker">{tr(d.Language,"admin.queue")}</span><strong>{fmt.Sprint(d.PendingCount)} <small>{tr(d.Language,"admin.pending")}</small></strong></div><span aria-hidden="true">↗</span></a>
+      if d.FailedCount>0 {
+       <a class="notice warning-notice" href={templ.SafeURL(d.URL("orders"))} hx-get={d.URL("orders")} hx-target="#studio" hx-swap="outerHTML" hx-push-url="true">{tr(d.Language,"admin.retry")}: {fmt.Sprint(d.FailedCount)} <span>↗</span></a>
+      }
+      <p class="admin-data-note">{tr(d.Language,"admin.overview.hint")}</p>
+     </section>
+    case "library":
+     <section class="admin-section admin-library"><div class="admin-section-heading"><div><span class="card-kicker">{tr(d.Language,"library.kicker")}</span><h2>{tr(d.Language,"admin.library.title")}</h2></div><span class="admin-section-caption">{tr(d.Language,"admin.library.hint")}</span></div>
+      <div class="admin-upload-grid"><details class="upload-disclosure"><summary><span>{tr(d.Language,"admin.add.dataset")}</span><span>+</span></summary>@UploadForm("datasets",true,d.Language)</details><details class="upload-disclosure"><summary><span>{tr(d.Language,"admin.add.music")}</span><span>+</span></summary>@UploadForm("music",true,d.Language)</details></div>
+      <section class="library-section"><div class="list-heading"><h2>{tr(d.Language,"library.datasets")}</h2><span class="count-label">{fmt.Sprint(len(d.Datasets))}</span></div><div class="card-list">
+       for _,item:=range d.Datasets {
+        @DatasetCard(item,true,d.Language)
        }
-      </div></article>
-     }
-    </div></section>
-   case "orders":
-    <section class="admin-section admin-orders" aria-labelledby="orders-title"><div class="admin-section-heading"><div><span class="card-kicker">{tr(d.Language,"admin.operations")}</span><h2 id="orders-title">{tr(d.Language,"admin.orders")}</h2></div><span class="admin-section-caption">{tr(d.Language,"admin.all.users")}</span></div><div class="order-list">
-     for _,order:=range d.Orders {
-      @OrderCard(order,true,d.Language)
-     }
-     if len(d.Orders)==0 {
-      @EmptyState("▷","Заказов пока нет","Оформленные видео появятся здесь вместе со статусами.")
-     }
-    </div></section>
-   case "promos":
-    <section class="admin-section admin-promos" aria-labelledby="promos-title"><div class="admin-section-heading"><div><span class="card-kicker">{tr(d.Language,"admin.sales")}</span><h2 id="promos-title">{tr(d.Language,"admin.promos")}</h2></div><span class="admin-section-caption">{tr(d.Language,"admin.discounts")}</span></div><details class="upload-disclosure"><summary><span><b>+</b> {tr(d.Language,"admin.create.promo")}</span><span>+</span></summary>
-     <form class="upload-form" action="/admin/promos" method="post" hx-post="/admin/promos" hx-target="#studio" hx-swap="outerHTML" hx-disabled-elt="find button">
-      <div class="form-field"><label class="field-label" for="new-promo-code">Код</label><input id="new-promo-code" name="code" type="text" maxlength="50" required placeholder="Например, WELCOME" autocomplete="off"/></div>
-      <div class="form-grid"><div><label class="field-label" for="promo-discount">Скидка, %</label><input id="promo-discount" name="discount_percent" type="number" min="1" max="100" value="20" required/></div><div><label class="field-label" for="promo-limit">Лимит использований</label><input id="promo-limit" name="max_uses" type="number" min="1" placeholder="Без лимита"/></div></div>
-      <div class="form-field"><label class="field-label" for="promo-until">Действует до (необязательно)</label><input id="promo-until" name="valid_until" type="date"/></div><button class="secondary-button" type="submit">Создать промокод <span>+</span></button>
-     </form>
-    </details>
-    <div class="card-list">
-     for _,promo:=range d.Promos {
-      <article class="item-card promo-card"><div class="promo-percent">{promo.Discount}</div><div class="item-main"><h2>{promo.Code}</h2><p>Использовано: {promo.Usage}</p><span class="detail-text">{promo.Expires}</span><span class={"resource-tag",templ.KV("archived-tag",!promo.Active)}>
-        if promo.Active {
-         Активен
+       if len(d.Datasets)==0 {
+        @EmptyState("▥",tr(d.Language,"admin.dataset.empty.title"),tr(d.Language,"admin.dataset.empty.text"))
+       }
+      </div></section>
+      <section class="library-section"><div class="list-heading"><h2>{tr(d.Language,"library.music")}</h2><span class="count-label">{fmt.Sprint(len(d.Music))}</span></div><div class="card-list">
+       for _,item:=range d.Music {
+        @MusicCard(item,true,d.Language)
+       }
+       if len(d.Music)==0 {
+        @EmptyState("♫",tr(d.Language,"admin.music.empty.title"),tr(d.Language,"admin.music.empty.text"))
+       }
+      </div></section>
+      <p class="admin-data-note">{tr(d.Language,"admin.list.limit")}</p>
+     </section>
+    case "users":
+     <section class="admin-section admin-users"><div class="admin-section-heading"><div><span class="card-kicker">{tr(d.Language,"admin.access")}</span><h2>{tr(d.Language,"admin.users")}</h2></div><span class="admin-section-caption">{fmt.Sprintf(tr(d.Language,"admin.accounts"),d.UserCount)}</span></div><div class="card-list">
+      for _,u:=range d.Users {
+       <article class="item-card user-card"><div class="user-avatar" aria-hidden="true">{initial(u.Name)}</div><div class="item-main"><h2>{u.Name}</h2><p>{u.Username}</p><span class="detail-text">Telegram {u.TelegramID} · {u.JoinedAt}</span>
+        if u.IsSelf {
+         <span class="resource-tag personal-tag">{tr(d.Language,"admin.self")}</span>
         } else {
-         Отключён
+         <form class="role-form" action={routeID("/admin/users",u.ID,"/role")} method="post" hx-post={routeID("/admin/users",u.ID,"/role")} hx-target="#studio" hx-swap="outerHTML" hx-disabled-elt="find button"><label class="sr-only" for={fmt.Sprintf("role-%d",u.ID)}>{tr(d.Language,"admin.role")}</label><select id={fmt.Sprintf("role-%d",u.ID)} name="role"><option value="USER" selected?={u.Role=="USER"}>{tr(d.Language,"admin.role.user")}</option><option value="ADMIN" selected?={u.Role=="ADMIN"}>{tr(d.Language,"admin.role.admin")}</option></select><button class="compact-button" type="submit">{tr(d.Language,"admin.save")}</button></form>
         }
-       </span></div><form action={routeID("/admin/promos",promo.ID,"/toggle")} method="post" hx-post={routeID("/admin/promos",promo.ID,"/toggle")} hx-target="#studio" hx-swap="outerHTML" hx-disabled-elt="find button"><button class="text-button" type="submit">
-        if promo.Active {
-         Отключить
-        } else {
-         Включить
+       </div></article>
+      }
+     </div><p class="admin-data-note">{tr(d.Language,"admin.list.limit")}</p></section>
+    case "orders":
+     <section class="admin-section admin-orders"><div class="admin-section-heading"><div><span class="card-kicker">{tr(d.Language,"admin.operations")}</span><h2>{tr(d.Language,"admin.orders")}</h2></div><span class="admin-section-caption">{fmt.Sprintf(tr(d.Language,"admin.orders.found"),d.TotalOrders)}</span></div>
+      <form class="admin-search" action="/admin" method="get" hx-get="/admin" hx-target="#studio" hx-swap="outerHTML" hx-push-url="true"><input type="hidden" name="tab" value="orders"/><input type="hidden" name="status" value={d.FilterStatus}/>
+       if d.IncludeDemo {
+        <input type="hidden" name="demo" value="1"/>
+       }
+       <label class="sr-only" for="admin-order-search">{tr(d.Language,"admin.search")}</label><input id="admin-order-search" name="q" type="search" value={d.Search} maxlength="100" placeholder={tr(d.Language,"admin.search")}/><button class="compact-button" type="submit">{tr(d.Language,"admin.search.button")}</button>
+      </form>
+      <nav class="admin-order-filters" aria-label={tr(d.Language,"admin.filter.label")}>
+       for _,f:=range adminOrderFilters(d.Language) {
+        <a href={templ.SafeURL(d.OrdersURL(f.Code,1))} hx-get={d.OrdersURL(f.Code,1)} hx-target="#studio" hx-swap="outerHTML" hx-push-url="true" class={templ.KV("is-active",d.FilterStatus==f.Code)}>{f.Label}</a>
+       }
+      </nav>
+      <div class="order-list">
+       for _,order:=range d.Orders {
+        @AdminOrderCard(order,d.Language)
+       }
+       if len(d.Orders)==0 {
+        @EmptyState("▷",tr(d.Language,"admin.orders.empty"),tr(d.Language,"admin.orders.empty.hint"))
+       }
+      </div>
+      if d.HasPrevious || d.HasNext {
+       <nav class="admin-pagination" aria-label={tr(d.Language,"admin.pages")}><span>
+        if d.HasPrevious {
+         <a href={templ.SafeURL(d.OrdersURL(d.FilterStatus,d.CurrentPage-1))} hx-get={d.OrdersURL(d.FilterStatus,d.CurrentPage-1)} hx-target="#studio" hx-swap="outerHTML show:window:top" hx-push-url="true">← {tr(d.Language,"admin.previous")}</a>
         }
-       </button></form></article>
-     }
-     if len(d.Promos)==0 {
-      @EmptyState("%","Промокодов пока нет","Создай скидку для первого заказа.")
-     }
-    </div></section>
-  }
+       </span><span>{fmt.Sprintf(tr(d.Language,"admin.page"),d.CurrentPage)}</span><span>
+        if d.HasNext {
+         <a href={templ.SafeURL(d.OrdersURL(d.FilterStatus,d.CurrentPage+1))} hx-get={d.OrdersURL(d.FilterStatus,d.CurrentPage+1)} hx-target="#studio" hx-swap="outerHTML show:window:top" hx-push-url="true">{tr(d.Language,"admin.next")} →</a>
+        }
+       </span></nav>
+      }
+     </section>
+    case "promos":
+     <section class="admin-section admin-promos"><div class="admin-section-heading"><div><span class="card-kicker">{tr(d.Language,"admin.sales")}</span><h2>{tr(d.Language,"admin.promos")}</h2></div><span class="admin-section-caption">{tr(d.Language,"admin.discounts")}</span></div><details class="upload-disclosure"><summary><span>{tr(d.Language,"admin.create.promo")}</span><span>+</span></summary>
+      <form class="upload-form" action="/admin/promos" method="post" hx-post="/admin/promos" hx-target="#studio" hx-swap="outerHTML" hx-disabled-elt="find button"><div class="form-field"><label class="field-label" for="new-promo-code">{tr(d.Language,"admin.promo.code")}</label><input id="new-promo-code" name="code" type="text" maxlength="50" required placeholder="WELCOME" autocomplete="off"/></div><div class="form-grid"><div><label class="field-label" for="promo-discount">{tr(d.Language,"admin.promo.discount")}</label><input id="promo-discount" name="discount_percent" type="number" min="1" max="100" value="20" required/></div><div><label class="field-label" for="promo-limit">{tr(d.Language,"admin.promo.limit")}</label><input id="promo-limit" name="max_uses" type="number" min="1" placeholder={tr(d.Language,"admin.promo.unlimited")}/></div></div><div class="form-field"><label class="field-label" for="promo-until">{tr(d.Language,"admin.promo.expiry")}</label><input id="promo-until" name="valid_until" type="date"/></div><button class="secondary-button" type="submit">{tr(d.Language,"admin.create.promo")} <span>+</span></button></form>
+     </details><div class="card-list">
+      for _,promo:=range d.Promos {
+       <article class="item-card promo-card"><div class="promo-percent">{promo.Discount}</div><div class="item-main"><h2>{promo.Code}</h2><p>{tr(d.Language,"admin.promo.used")} {promo.Usage}</p><span class="detail-text">{promo.Expires}</span><span class={"resource-tag",templ.KV("archived-tag",promo.State!="active")}>{tr(d.Language,"admin.promo.state."+promo.State)}</span></div><form action={routeID("/admin/promos",promo.ID,"/toggle")} method="post" hx-post={routeID("/admin/promos",promo.ID,"/toggle")} hx-target="#studio" hx-swap="outerHTML" hx-disabled-elt="find button"><button class="text-button" type="submit">{tr(d.Language,ternaryKey(promo.Active,"admin.disable","admin.enable"))}</button></form></article>
+      }
+      if len(d.Promos)==0 {
+       @EmptyState("%",tr(d.Language,"admin.promos.empty"),tr(d.Language,"admin.promos.empty.hint"))
+      }
+     </div></section>
+    }
    </div>
   </div>
  </section>
+}
+
+templ AdminOrderCard(order AdminOrder,language string) {
+ <article class="admin-order-card">
+  <header><div><span class="card-kicker">{adminOrderNumber(order,language)}</span><span class="admin-order-id">ID {fmt.Sprint(order.ID)}</span></div><span class={statusClass(order.Status)}>{orderLabel(order.Status,language)}</span></header>
+  <div class="admin-order-owner"><strong>{order.OwnerName}</strong><span>{order.OwnerUsername}</span>
+   if order.LocalDemo {
+    <span class="resource-tag archived-tag">{tr(language,"admin.test")}</span>
+   }
+  </div><p class="admin-order-meta">{order.CreatedAt} · Telegram {order.TelegramID}</p>
+  <div class="admin-order-payment"><strong>{adminOrderPayment(order,language)}</strong><span>{fmt.Sprintf(tr(language,"admin.order.videos"),order.ItemCount)}</span></div>
+  <details class="admin-order-details"><summary>{tr(language,"admin.order.details")} <span aria-hidden="true">⌄</span></summary><div class="admin-job-list">
+   for _,job:=range order.Jobs {
+    <div class="admin-job-row"><div class="admin-job-heading"><strong>{job.Title}</strong>
+     if order.Status=="PAID" {
+      <span class={statusClass(job.Status)}>{jobLabel(job.Status,language)}</span>
+     }
+    </div><p>{job.Theme} · {job.Music}</p>
+     if order.Status=="PAID" && job.Status=="COMPLETED" {
+      <div class="admin-job-actions"><span class={templ.KV("is-delivered",job.TelegramSent)}>{tr(language,ternaryKey(job.TelegramSent,"admin.video.sent","admin.video.unsent"))}</span><a class="inline-link" href={templ.SafeURL(job.DownloadURL)} download>{tr(language,"status.download")} ↓</a></div>
+     }
+     if order.Status=="PAID" && job.Status=="FAILED" {
+      <p class="admin-job-error">{job.Error}</p><form action={jobActionURL(job.ID,true,"retry")} method="post" hx-post={jobActionURL(job.ID,true,"retry")} hx-target="#studio" hx-swap="outerHTML" hx-disabled-elt="find button"><button class="text-button" type="submit">{tr(language,"status.retry.create")} ↻</button></form>
+     }
+    </div>
+   }
+  </div></details>
+ </article>
 }

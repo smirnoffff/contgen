@@ -685,119 +685,6 @@ func (s *server) sendVideo(w http.ResponseWriter, r *http.Request) {
 	redirectMessage(w, r, "/status", "Видео отправлено в Telegram", "")
 }
 
-func parseTab(r *http.Request) string {
-	switch r.URL.Query().Get("tab") {
-	case "library", "users", "orders", "promos":
-		return r.URL.Query().Get("tab")
-	}
-	return "overview"
-}
-
-func (s *server) admin(w http.ResponseWriter, r *http.Request) {
-	u, ok := s.requireUser(w, r, true)
-	if !ok {
-		return
-	}
-	page, err := s.pageData(r, u)
-	if err != nil {
-		s.unavailable(w, err)
-		return
-	}
-	tab := parseTab(r)
-	d := views.AdminData{PageData: page, Tab: tab}
-	sum, err := s.db.AdminSummary(r.Context())
-	if err != nil {
-		s.unavailable(w, err)
-		return
-	}
-	d.UserCount, d.OrderCount, d.PendingCount, d.FailedCount = sum.Users, sum.Orders, sum.PendingJobs+sum.ProcessingJobs, sum.FailedJobs
-	d.JobCount = sum.PendingJobs + sum.ProcessingJobs + sum.CompletedJobs + sum.FailedJobs
-	revenue, err := s.db.AdminRevenue(r.Context())
-	if err != nil {
-		s.unavailable(w, err)
-		return
-	}
-	d.Revenue = numericLabel(revenue) + " ⭐"
-	switch tab {
-	case "users":
-		rows, e := s.db.AdminListUsers(r.Context())
-		if e != nil {
-			s.unavailable(w, e)
-			return
-		}
-		for _, v := range rows {
-			name, un := v.FirstName, ""
-			if v.Username != nil {
-				un = "@" + *v.Username
-			}
-			d.Users = append(d.Users, views.AdminUser{ID: v.ID, Name: name, Username: un, TelegramID: strconv.FormatInt(v.TgID, 10), Role: string(v.Role), JoinedAt: v.CreatedAt.Format("02.01.2006"), IsSelf: v.ID == u.ID})
-		}
-	case "library":
-		ds, e := s.db.AdminListDatasets(r.Context())
-		if e != nil {
-			s.unavailable(w, e)
-			return
-		}
-		for _, v := range ds {
-			d.Datasets = append(d.Datasets, views.DatasetItem{ID: v.Dataset.ID, Title: v.Dataset.Title, Active: true, System: v.Dataset.UserID == nil, CanPublish: v.Dataset.UserID != nil, Detail: fmt.Sprintf("%d точек · %s", v.PointCount, ownerLabel(v.OwnerName))})
-		}
-		ms, e := s.db.AdminListMusicTracks(r.Context())
-		if e != nil {
-			s.unavailable(w, e)
-			return
-		}
-		for _, v := range ms {
-			d.Music = append(d.Music, views.MusicItem{ID: v.MusicTrack.ID, Title: v.MusicTrack.Title, Active: v.MusicTrack.IsActive, System: v.MusicTrack.UserID == nil, CanPublish: v.MusicTrack.UserID != nil, Detail: durationLabel(v.MusicTrack.DurationSec), URL: fmt.Sprintf("/music/%d/audio", v.MusicTrack.ID)})
-		}
-	case "promos":
-		rows, e := s.db.AdminListPromocodes(r.Context())
-		if e != nil {
-			s.unavailable(w, e)
-			return
-		}
-		for _, v := range rows {
-			expiry := "Без срока"
-			if v.ValidUntil != nil {
-				expiry = v.ValidUntil.Format("02.01.2006")
-			}
-			usage := fmt.Sprintf("%d", v.UsedCount)
-			if v.MaxUses != nil {
-				usage += fmt.Sprintf(" / %d", *v.MaxUses)
-			}
-			d.Promos = append(d.Promos, views.PromoItem{ID: v.ID, Code: v.Code, Discount: fmt.Sprintf("-%d%%", v.DiscountPercent), Usage: usage, Expires: expiry, Active: v.IsActive})
-		}
-	case "orders":
-		rows, e := s.db.AdminListOrders(r.Context())
-		if e != nil {
-			s.unavailable(w, e)
-			return
-		}
-		jobs, e := s.db.AdminListJobs(r.Context())
-		if e != nil {
-			s.unavailable(w, e)
-			return
-		}
-		by := map[int64][]views.Job{}
-		for _, v := range jobs {
-			language := s.languageForRequest(r, string(u.Language))
-			j := s.viewJob(v.RenderJob, views.DatasetTitle(v.DatasetTitle, language), nil, u, language)
-			j.CanSendTelegram = false
-			by[v.RenderJob.OrderID] = append(by[v.RenderJob.OrderID], j)
-		}
-		for _, v := range rows {
-			d.Orders = append(d.Orders, views.Order{ID: v.Order.ID, Status: string(v.Order.Status), CreatedAt: v.Order.CreatedAt.Format("02.01.2006 15:04"), Total: numericLabel(v.Order.TotalAmount) + " ⭐", Payment: paymentLabel(v.Order.PaymentMethod), Jobs: by[v.Order.ID]})
-		}
-	}
-	s.page(w, r, views.Admin(d))
-}
-
-func ownerLabel(v *string) string {
-	if v == nil {
-		return "общий"
-	}
-	return "личный · " + *v
-}
-
 func (s *server) adminVideo(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.requireUser(w, r, true); !ok {
 		return
@@ -836,7 +723,8 @@ func (s *server) adminJobCard(w http.ResponseWriter, r *http.Request) {
 	render(w, r, views.JobState(j, true, s.languageForRequest(r, string(u.Language))))
 }
 func (s *server) adminMusicToggle(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireUser(w, r, true); !ok {
+	u, ok := s.requireUser(w, r, true)
+	if !ok {
 		return
 	}
 	id, err := idParam(r)
@@ -853,10 +741,11 @@ func (s *server) adminMusicToggle(w http.ResponseWriter, r *http.Request) {
 		s.operationError(w, r, "/admin?tab=library", err)
 		return
 	}
-	redirectMessage(w, r, "/admin?tab=library", "Статус музыки обновлён", "")
+	redirectMessage(w, r, "/admin?tab=library", views.Translate(s.languageForRequest(r, string(u.Language)), "admin.notice.music.updated"), "")
 }
 func (s *server) adminDatasetPublish(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireUser(w, r, true); !ok {
+	u, ok := s.requireUser(w, r, true)
+	if !ok {
 		return
 	}
 	id, e := idParam(r)
@@ -864,14 +753,19 @@ func (s *server) adminDatasetPublish(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if _, e = s.db.AdminPublishDataset(r.Context(), id); e != nil {
+	if changed, err := s.db.AdminPublishDataset(r.Context(), id); err != nil || changed != 1 {
+		if err == nil {
+			err = storage.ErrNotFound
+		}
+		e = err
 		s.operationError(w, r, "/admin?tab=library", e)
 		return
 	}
-	redirectMessage(w, r, "/admin?tab=library", "Датасет опубликован для всех", "")
+	redirectMessage(w, r, "/admin?tab=library", views.Translate(s.languageForRequest(r, string(u.Language)), "admin.notice.dataset.published"), "")
 }
 func (s *server) adminMusicPublish(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireUser(w, r, true); !ok {
+	u, ok := s.requireUser(w, r, true)
+	if !ok {
 		return
 	}
 	id, e := idParam(r)
@@ -879,26 +773,36 @@ func (s *server) adminMusicPublish(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if _, e = s.db.AdminPublishMusic(r.Context(), id); e != nil {
+	if changed, err := s.db.AdminPublishMusic(r.Context(), id); err != nil || changed != 1 {
+		if err == nil {
+			err = storage.ErrNotFound
+		}
+		e = err
 		s.operationError(w, r, "/admin?tab=library", e)
 		return
 	}
-	redirectMessage(w, r, "/admin?tab=library", "Музыка опубликована для всех", "")
+	redirectMessage(w, r, "/admin?tab=library", views.Translate(s.languageForRequest(r, string(u.Language)), "admin.notice.music.published"), "")
 }
 func (s *server) adminRetryJob(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireUser(w, r, true); !ok {
+	u, ok := s.requireUser(w, r, true)
+	if !ok {
 		return
 	}
-	id, e := idParam(r)
-	if e != nil {
+	id, err := idParam(r)
+	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
-	if _, e = s.db.AdminRetryJob(r.Context(), id); e != nil {
-		s.operationError(w, r, "/admin?tab=orders", e)
+	changed, err := s.db.AdminRetryJob(r.Context(), id)
+	if err != nil {
+		s.operationError(w, r, "/admin?tab=orders", err)
 		return
 	}
-	redirectMessage(w, r, "/admin?tab=orders", "Видео снова поставлено в очередь", "")
+	if changed != 1 {
+		redirectMessage(w, r, "/admin?tab=orders", "", views.Translate(s.languageForRequest(r, string(u.Language)), "admin.retry.unavailable"))
+		return
+	}
+	redirectMessage(w, r, "/admin?tab=orders", views.Translate(s.languageForRequest(r, string(u.Language)), "admin.notice.job.queued"), "")
 }
 func (s *server) adminUserRole(w http.ResponseWriter, r *http.Request) {
 	u, ok := s.requireUser(w, r, true)
@@ -915,21 +819,22 @@ func (s *server) adminUserRole(w http.ResponseWriter, r *http.Request) {
 	}
 	role := dbgen.UserRole(r.FormValue("role"))
 	if role != dbgen.UserRoleUSER && role != dbgen.UserRoleADMIN {
-		redirectMessage(w, r, "/admin?tab=users", "", "Некорректная роль")
+		redirectMessage(w, r, "/admin?tab=users", "", views.Translate(s.languageForRequest(r, string(u.Language)), "admin.error.role"))
 		return
 	}
 	if id == u.ID && role != dbgen.UserRoleADMIN {
-		redirectMessage(w, r, "/admin?tab=users", "", "Нельзя снять роль у самого себя")
+		redirectMessage(w, r, "/admin?tab=users", "", views.Translate(s.languageForRequest(r, string(u.Language)), "admin.error.self.demote"))
 		return
 	}
 	if _, e = s.db.AdminSetUserRole(r.Context(), dbgen.AdminSetUserRoleParams{ID: id, Role: role}); e != nil {
 		s.operationError(w, r, "/admin?tab=users", e)
 		return
 	}
-	redirectMessage(w, r, "/admin?tab=users", "Роль обновлена", "")
+	redirectMessage(w, r, "/admin?tab=users", views.Translate(s.languageForRequest(r, string(u.Language)), "admin.notice.role.updated"), "")
 }
 func (s *server) adminCreatePromo(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireUser(w, r, true); !ok {
+	u, ok := s.requireUser(w, r, true)
+	if !ok {
 		return
 	}
 	if !parseForm(w, r) {
@@ -938,14 +843,14 @@ func (s *server) adminCreatePromo(w http.ResponseWriter, r *http.Request) {
 	code := strings.ToUpper(strings.TrimSpace(r.FormValue("code")))
 	discount, e := strconv.Atoi(r.FormValue("discount_percent"))
 	if e != nil || code == "" || len(code) > 50 || discount < 1 || discount > 100 {
-		redirectMessage(w, r, "/admin?tab=promos", "", "Проверь код и скидку")
+		redirectMessage(w, r, "/admin?tab=promos", "", views.Translate(s.languageForRequest(r, string(u.Language)), "admin.error.promo"))
 		return
 	}
 	var maxUses *int
 	if raw := r.FormValue("max_uses"); raw != "" {
 		v, er := strconv.Atoi(raw)
 		if er != nil || v < 1 {
-			redirectMessage(w, r, "/admin?tab=promos", "", "Некорректный лимит")
+			redirectMessage(w, r, "/admin?tab=promos", "", views.Translate(s.languageForRequest(r, string(u.Language)), "admin.error.limit"))
 			return
 		}
 		maxUses = &v
@@ -954,7 +859,7 @@ func (s *server) adminCreatePromo(w http.ResponseWriter, r *http.Request) {
 	if raw := r.FormValue("valid_until"); raw != "" {
 		day, er := time.Parse("2006-01-02", raw)
 		if er != nil {
-			redirectMessage(w, r, "/admin?tab=promos", "", "Некорректная дата")
+			redirectMessage(w, r, "/admin?tab=promos", "", views.Translate(s.languageForRequest(r, string(u.Language)), "admin.error.date"))
 			return
 		}
 		end := day.AddDate(0, 0, 1)
@@ -964,10 +869,11 @@ func (s *server) adminCreatePromo(w http.ResponseWriter, r *http.Request) {
 		s.operationError(w, r, "/admin?tab=promos", e)
 		return
 	}
-	redirectMessage(w, r, "/admin?tab=promos", "Промокод создан", "")
+	redirectMessage(w, r, "/admin?tab=promos", views.Translate(s.languageForRequest(r, string(u.Language)), "admin.notice.promo.created"), "")
 }
 func (s *server) adminPromoToggle(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireUser(w, r, true); !ok {
+	u, ok := s.requireUser(w, r, true)
+	if !ok {
 		return
 	}
 	id, e := idParam(r)
@@ -984,7 +890,7 @@ func (s *server) adminPromoToggle(w http.ResponseWriter, r *http.Request) {
 		s.operationError(w, r, "/admin?tab=promos", e)
 		return
 	}
-	redirectMessage(w, r, "/admin?tab=promos", "Статус промокода обновлён", "")
+	redirectMessage(w, r, "/admin?tab=promos", views.Translate(s.languageForRequest(r, string(u.Language)), "admin.notice.promo.updated"), "")
 }
 
 func (s *server) operationError(w http.ResponseWriter, r *http.Request, path string, err error) {

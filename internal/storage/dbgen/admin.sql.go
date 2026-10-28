@@ -12,10 +12,34 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const adminCountOrders = `-- name: AdminCountOrders :one
+SELECT count(*) FROM orders o JOIN users u ON u.id = o.user_id
+WHERE (u.tg_id > 0 OR $1::boolean)
+AND ($2::text = '' OR o.status::text = $2)
+AND ($3::text = '' OR u.first_name ILIKE '%' || $3 || '%'
+    OR u.username ILIKE '%' || $3 || '%'
+    OR ('@' || u.username) ILIKE '%' || $3 || '%' OR o.id::text = $3
+    OR u.tg_id::text = $3)
+`
+
+type AdminCountOrdersParams struct {
+	IncludeDemo bool
+	OrderStatus string
+	Search      string
+}
+
+func (q *Queries) AdminCountOrders(ctx context.Context, arg AdminCountOrdersParams) (int64, error) {
+	row := q.db.QueryRow(ctx, adminCountOrders, arg.IncludeDemo, arg.OrderStatus, arg.Search)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const adminListDatasets = `-- name: AdminListDatasets :many
 SELECT datasets.id, datasets.user_id, datasets.title, datasets.created_at, users.first_name AS owner_name, count(data_points.id)::bigint AS point_count
 FROM datasets LEFT JOIN users ON users.id = datasets.user_id
 LEFT JOIN data_points ON data_points.dataset_id = datasets.id
+WHERE datasets.user_id IS NULL OR users.tg_id > 0 OR $1::boolean
 GROUP BY datasets.id, users.id ORDER BY datasets.created_at DESC, datasets.id DESC LIMIT 100
 `
 
@@ -25,8 +49,8 @@ type AdminListDatasetsRow struct {
 	PointCount int64
 }
 
-func (q *Queries) AdminListDatasets(ctx context.Context) ([]AdminListDatasetsRow, error) {
-	rows, err := q.db.Query(ctx, adminListDatasets)
+func (q *Queries) AdminListDatasets(ctx context.Context, includeDemo bool) ([]AdminListDatasetsRow, error) {
+	rows, err := q.db.Query(ctx, adminListDatasets, includeDemo)
 	if err != nil {
 		return nil, err
 	}
@@ -53,21 +77,21 @@ func (q *Queries) AdminListDatasets(ctx context.Context) ([]AdminListDatasetsRow
 }
 
 const adminListJobs = `-- name: AdminListJobs :many
-SELECT render_jobs.id, render_jobs.order_id, render_jobs.dataset_id, render_jobs.music_track_id, render_jobs.theme, render_jobs.status, render_jobs.telegram_file_id, render_jobs.error_message, render_jobs.created_at, render_jobs.completed_at, users.first_name, datasets.title AS dataset_title
-FROM render_jobs JOIN orders ON orders.id = render_jobs.order_id
-JOIN users ON users.id = orders.user_id JOIN datasets ON datasets.id = render_jobs.dataset_id
-WHERE orders.status = 'PAID'
-ORDER BY render_jobs.created_at DESC, render_jobs.id DESC LIMIT 100
+SELECT render_jobs.id, render_jobs.order_id, render_jobs.dataset_id, render_jobs.music_track_id, render_jobs.theme, render_jobs.status, render_jobs.telegram_file_id, render_jobs.error_message, render_jobs.created_at, render_jobs.completed_at, datasets.title AS dataset_title, music_tracks.title AS music_title
+FROM render_jobs JOIN datasets ON datasets.id = render_jobs.dataset_id
+LEFT JOIN music_tracks ON music_tracks.id = render_jobs.music_track_id
+WHERE render_jobs.order_id = ANY($1::bigint[])
+ORDER BY render_jobs.created_at, render_jobs.id
 `
 
 type AdminListJobsRow struct {
 	RenderJob    RenderJob
-	FirstName    string
 	DatasetTitle string
+	MusicTitle   *string
 }
 
-func (q *Queries) AdminListJobs(ctx context.Context) ([]AdminListJobsRow, error) {
-	rows, err := q.db.Query(ctx, adminListJobs)
+func (q *Queries) AdminListJobs(ctx context.Context, orderIds []int64) ([]AdminListJobsRow, error) {
+	rows, err := q.db.Query(ctx, adminListJobs, orderIds)
 	if err != nil {
 		return nil, err
 	}
@@ -86,8 +110,8 @@ func (q *Queries) AdminListJobs(ctx context.Context) ([]AdminListJobsRow, error)
 			&i.RenderJob.ErrorMessage,
 			&i.RenderJob.CreatedAt,
 			&i.RenderJob.CompletedAt,
-			&i.FirstName,
 			&i.DatasetTitle,
+			&i.MusicTitle,
 		); err != nil {
 			return nil, err
 		}
@@ -102,6 +126,7 @@ func (q *Queries) AdminListJobs(ctx context.Context) ([]AdminListJobsRow, error)
 const adminListMusicTracks = `-- name: AdminListMusicTracks :many
 SELECT music_tracks.id, music_tracks.user_id, music_tracks.title, music_tracks.file_path, music_tracks.is_active, music_tracks.duration_sec, music_tracks.created_at, users.first_name AS owner_name
 FROM music_tracks LEFT JOIN users ON users.id = music_tracks.user_id
+WHERE music_tracks.user_id IS NULL OR users.tg_id > 0 OR $1::boolean
 ORDER BY music_tracks.created_at DESC, music_tracks.id DESC LIMIT 100
 `
 
@@ -110,8 +135,8 @@ type AdminListMusicTracksRow struct {
 	OwnerName  *string
 }
 
-func (q *Queries) AdminListMusicTracks(ctx context.Context) ([]AdminListMusicTracksRow, error) {
-	rows, err := q.db.Query(ctx, adminListMusicTracks)
+func (q *Queries) AdminListMusicTracks(ctx context.Context, includeDemo bool) ([]AdminListMusicTracksRow, error) {
+	rows, err := q.db.Query(ctx, adminListMusicTracks, includeDemo)
 	if err != nil {
 		return nil, err
 	}
@@ -140,21 +165,49 @@ func (q *Queries) AdminListMusicTracks(ctx context.Context) ([]AdminListMusicTra
 }
 
 const adminListOrders = `-- name: AdminListOrders :many
-SELECT orders.id, orders.user_id, orders.promocode_id, orders.discount_percent_applied, orders.discount_amount, orders.payment_method, orders.total_amount, orders.status, orders.created_at, orders.updated_at, users.first_name, users.tg_id, count(render_jobs.id)::bigint AS item_count
-FROM orders JOIN users ON users.id = orders.user_id
-LEFT JOIN render_jobs ON render_jobs.order_id = orders.id
-GROUP BY orders.id, users.id ORDER BY orders.created_at DESC, orders.id DESC LIMIT 100
+SELECT o.id, o.user_id, o.promocode_id, o.discount_percent_applied, o.discount_amount, o.payment_method, o.total_amount, o.status, o.created_at, o.updated_at, u.first_name, u.username, u.tg_id,
+(SELECT count(*) FROM orders older WHERE older.user_id = o.user_id AND older.status <> 'CART'
+    AND (older.created_at, older.id) <= (o.created_at, o.id))::bigint AS order_number,
+(SELECT count(*) FROM render_jobs j WHERE j.order_id = o.id)::bigint AS item_count,
+COALESCE((SELECT sum(p.amount) FROM payments p WHERE p.order_id = o.id
+    AND p.method = 'STARS' AND p.status = 'SUCCEEDED' AND NULLIF(p.external_id, '') IS NOT NULL), 0)::numeric AS stars_received
+FROM orders o JOIN users u ON u.id = o.user_id
+WHERE (u.tg_id > 0 OR $1::boolean)
+AND ($2::text = '' OR o.status::text = $2)
+AND ($3::text = '' OR u.first_name ILIKE '%' || $3 || '%'
+    OR u.username ILIKE '%' || $3 || '%'
+    OR ('@' || u.username) ILIKE '%' || $3 || '%' OR o.id::text = $3
+    OR u.tg_id::text = $3)
+ORDER BY o.created_at DESC, o.id DESC
+LIMIT $5::int OFFSET $4::int
 `
 
-type AdminListOrdersRow struct {
-	Order     Order
-	FirstName string
-	TgID      int64
-	ItemCount int64
+type AdminListOrdersParams struct {
+	IncludeDemo bool
+	OrderStatus string
+	Search      string
+	PageOffset  int
+	PageLimit   int
 }
 
-func (q *Queries) AdminListOrders(ctx context.Context) ([]AdminListOrdersRow, error) {
-	rows, err := q.db.Query(ctx, adminListOrders)
+type AdminListOrdersRow struct {
+	Order         Order
+	FirstName     string
+	Username      *string
+	TgID          int64
+	OrderNumber   int64
+	ItemCount     int64
+	StarsReceived pgtype.Numeric
+}
+
+func (q *Queries) AdminListOrders(ctx context.Context, arg AdminListOrdersParams) ([]AdminListOrdersRow, error) {
+	rows, err := q.db.Query(ctx, adminListOrders,
+		arg.IncludeDemo,
+		arg.OrderStatus,
+		arg.Search,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -174,8 +227,11 @@ func (q *Queries) AdminListOrders(ctx context.Context) ([]AdminListOrdersRow, er
 			&i.Order.CreatedAt,
 			&i.Order.UpdatedAt,
 			&i.FirstName,
+			&i.Username,
 			&i.TgID,
+			&i.OrderNumber,
 			&i.ItemCount,
+			&i.StarsReceived,
 		); err != nil {
 			return nil, err
 		}
@@ -221,11 +277,12 @@ func (q *Queries) AdminListPromocodes(ctx context.Context) ([]Promocode, error) 
 }
 
 const adminListUsers = `-- name: AdminListUsers :many
-SELECT id, tg_id, role, username, first_name, language, created_at FROM users ORDER BY created_at DESC, id DESC LIMIT 100
+SELECT id, tg_id, role, username, first_name, language, created_at FROM users WHERE tg_id > 0 OR $1::boolean
+ORDER BY created_at DESC, id DESC LIMIT 100
 `
 
-func (q *Queries) AdminListUsers(ctx context.Context) ([]User, error) {
-	rows, err := q.db.Query(ctx, adminListUsers)
+func (q *Queries) AdminListUsers(ctx context.Context, includeDemo bool) ([]User, error) {
+	rows, err := q.db.Query(ctx, adminListUsers, includeDemo)
 	if err != nil {
 		return nil, err
 	}
@@ -292,14 +349,22 @@ func (q *Queries) AdminRetryJob(ctx context.Context, id int64) (int64, error) {
 }
 
 const adminRevenue = `-- name: AdminRevenue :one
-SELECT COALESCE(sum(total_amount), 0)::numeric AS amount FROM orders WHERE status = 'PAID'
+SELECT COALESCE(sum(p.amount), 0)::numeric AS stars_received, count(*)::bigint AS stars_payments
+FROM payments p JOIN orders o ON o.id = p.order_id JOIN users u ON u.id = o.user_id
+WHERE p.status = 'SUCCEEDED' AND p.method = 'STARS' AND NULLIF(p.external_id, '') IS NOT NULL
+AND o.status = 'PAID' AND (u.tg_id > 0 OR $1::boolean)
 `
 
-func (q *Queries) AdminRevenue(ctx context.Context) (pgtype.Numeric, error) {
-	row := q.db.QueryRow(ctx, adminRevenue)
-	var amount pgtype.Numeric
-	err := row.Scan(&amount)
-	return amount, err
+type AdminRevenueRow struct {
+	StarsReceived pgtype.Numeric
+	StarsPayments int64
+}
+
+func (q *Queries) AdminRevenue(ctx context.Context, includeDemo bool) (AdminRevenueRow, error) {
+	row := q.db.QueryRow(ctx, adminRevenue, includeDemo)
+	var i AdminRevenueRow
+	err := row.Scan(&i.StarsReceived, &i.StarsPayments)
+	return i, err
 }
 
 const adminSetMusicActive = `-- name: AdminSetMusicActive :execrows
@@ -354,42 +419,52 @@ func (q *Queries) AdminSetUserRole(ctx context.Context, arg AdminSetUserRolePara
 }
 
 const adminSummary = `-- name: AdminSummary :one
-SELECT (SELECT count(*) FROM users)::bigint AS users,
-(SELECT count(*) FROM orders WHERE status = 'PAID')::bigint AS orders,
-(SELECT count(*) FROM render_jobs WHERE status = 'PENDING' AND order_id IN (SELECT id FROM orders WHERE status = 'PAID'))::bigint AS pending_jobs,
-(SELECT count(*) FROM render_jobs WHERE status = 'PROCESSING')::bigint AS processing_jobs,
-(SELECT count(*) FROM render_jobs WHERE status = 'COMPLETED')::bigint AS completed_jobs,
-(SELECT count(*) FROM render_jobs WHERE status = 'FAILED')::bigint AS failed_jobs,
-(SELECT count(*) FROM datasets)::bigint AS datasets,
-(SELECT count(*) FROM music_tracks)::bigint AS music_tracks,
-(SELECT count(*) FROM promocodes)::bigint AS promocodes
+WITH visible_users AS (
+    SELECT id, tg_id, role, username, first_name, language, created_at FROM users WHERE tg_id > 0 OR $1::boolean
+), visible_orders AS (
+    SELECT o.id, o.user_id, o.promocode_id, o.discount_percent_applied, o.discount_amount, o.payment_method, o.total_amount, o.status, o.created_at, o.updated_at FROM orders o JOIN visible_users u ON u.id = o.user_id
+), visible_jobs AS (
+    SELECT j.id, j.order_id, j.dataset_id, j.music_track_id, j.theme, j.status, j.telegram_file_id, j.error_message, j.created_at, j.completed_at FROM render_jobs j JOIN visible_orders o ON o.id = j.order_id WHERE o.status = 'PAID'
+)
+SELECT (SELECT count(*) FROM visible_users)::bigint AS users,
+(SELECT count(*) FROM visible_orders WHERE status = 'PAID')::bigint AS orders,
+(SELECT count(*) FROM visible_orders WHERE status = 'CART')::bigint AS carts,
+(SELECT count(*) FROM visible_jobs WHERE status = 'PENDING')::bigint AS pending_jobs,
+(SELECT count(*) FROM visible_jobs WHERE status = 'PROCESSING')::bigint AS processing_jobs,
+(SELECT count(*) FROM visible_jobs WHERE status = 'COMPLETED')::bigint AS completed_jobs,
+(SELECT count(*) FROM visible_jobs WHERE status = 'FAILED')::bigint AS failed_jobs,
+(SELECT count(*) FROM visible_jobs WHERE status = 'COMPLETED' AND telegram_file_id IS NOT NULL)::bigint AS delivered_jobs,
+(SELECT count(*) FROM visible_orders WHERE status = 'PAID' AND payment_method = 'ADS')::bigint AS ad_orders,
+(SELECT count(*) FROM visible_orders WHERE status = 'PAID' AND payment_method = 'PROMO')::bigint AS promo_orders
 `
 
 type AdminSummaryRow struct {
 	Users          int64
 	Orders         int64
+	Carts          int64
 	PendingJobs    int64
 	ProcessingJobs int64
 	CompletedJobs  int64
 	FailedJobs     int64
-	Datasets       int64
-	MusicTracks    int64
-	Promocodes     int64
+	DeliveredJobs  int64
+	AdOrders       int64
+	PromoOrders    int64
 }
 
-func (q *Queries) AdminSummary(ctx context.Context) (AdminSummaryRow, error) {
-	row := q.db.QueryRow(ctx, adminSummary)
+func (q *Queries) AdminSummary(ctx context.Context, includeDemo bool) (AdminSummaryRow, error) {
+	row := q.db.QueryRow(ctx, adminSummary, includeDemo)
 	var i AdminSummaryRow
 	err := row.Scan(
 		&i.Users,
 		&i.Orders,
+		&i.Carts,
 		&i.PendingJobs,
 		&i.ProcessingJobs,
 		&i.CompletedJobs,
 		&i.FailedJobs,
-		&i.Datasets,
-		&i.MusicTracks,
-		&i.Promocodes,
+		&i.DeliveredJobs,
+		&i.AdOrders,
+		&i.PromoOrders,
 	)
 	return i, err
 }
